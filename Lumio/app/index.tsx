@@ -53,9 +53,9 @@ export default function SplashScreen() {
       });
     }, 3000); // Start fading in text during the first exhale
     
-    // Navigate to main app after showing splash for a bit
+    // Navigate to auth flow after showing splash for a bit
     const timer = setTimeout(() => {
-      router.replace('/(tabs)');
+      router.replace('/auth');
     }, 6000); // Show splash for 6 seconds
     
     return () => clearTimeout(timer);
