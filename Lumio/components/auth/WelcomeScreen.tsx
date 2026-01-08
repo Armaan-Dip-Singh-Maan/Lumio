@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -16,13 +16,10 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onEnter }: WelcomeScreenProps) {
-  const [showButton, setShowButton] = useState(false);
   const insets = useSafeAreaInsets();
 
   const containerOpacity = useSharedValue(0);
   const containerTranslateY = useSharedValue(20);
-  const buttonOpacity = useSharedValue(0);
-  const buttonTranslateY = useSharedValue(10);
 
   useEffect(() => {
     containerOpacity.value = withTiming(1, {
@@ -34,18 +31,12 @@ export function WelcomeScreen({ onEnter }: WelcomeScreenProps) {
       easing: Easing.out(Easing.ease),
     });
 
-    // Show button after 1200ms delay
-    setTimeout(() => {
-      setShowButton(true);
-      buttonOpacity.value = withTiming(1, {
-        duration: 600,
-        easing: Easing.out(Easing.ease),
-      });
-      buttonTranslateY.value = withTiming(0, {
-        duration: 600,
-        easing: Easing.out(Easing.ease),
-      });
-    }, 1200);
+    // Auto-navigate after 2000ms delay (removed button)
+    const timer = setTimeout(() => {
+      onEnter();
+    }, 2000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const containerStyle = useAnimatedStyle(() => ({
@@ -53,10 +44,6 @@ export function WelcomeScreen({ onEnter }: WelcomeScreenProps) {
     transform: [{ translateY: containerTranslateY.value }],
   }));
 
-  const buttonStyle = useAnimatedStyle(() => ({
-    opacity: buttonOpacity.value,
-    transform: [{ translateY: buttonTranslateY.value }],
-  }));
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -67,18 +54,6 @@ export function WelcomeScreen({ onEnter }: WelcomeScreenProps) {
         <Text style={styles.text}>
           Take a moment.{'\n'}Lumio is here when you're ready.
         </Text>
-
-        {showButton && (
-          <Animated.View style={buttonStyle}>
-            <TouchableOpacity
-              style={styles.enterButton}
-              onPress={onEnter}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.enterButtonText}>Enter Lumio</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
       </Animated.View>
     </View>
   );
@@ -111,22 +86,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 28,
     marginBottom: 48,
-  },
-  enterButton: {
-    backgroundColor: AuthColors.primary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    minHeight: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 200,
-  },
-  enterButtonText: {
-    fontSize: AuthTypography.fontSize.base,
-    fontWeight: AuthTypography.fontWeight.medium,
-    color: AuthColors.primaryForeground,
-    letterSpacing: 0.3,
   },
 });
 

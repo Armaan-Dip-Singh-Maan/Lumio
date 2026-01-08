@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { AmbientBackground } from './ambient/AmbientBackground';
 import { EntryScreen } from './EntryScreen';
 import { PasswordScreen } from './PasswordScreen';
 import { WelcomeScreen } from './WelcomeScreen';
-import { SplashScreen } from './SplashScreen';
 import { AuthColors, AuthTypography } from '@/constants/auth-theme';
 import { AuthStorage } from '@/utils/auth-storage';
 
-type AuthStep = 'splash' | 'entry' | 'password' | 'welcome' | 'complete';
+type AuthStep = 'entry' | 'password' | 'welcome';
 type UserType = 'new' | 'existing' | null;
 
 interface AuthFlowProps {
@@ -54,7 +53,6 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showSplashForNewUser, setShowSplashForNewUser] = useState(false);
 
   const handleEmailSubmit = async (submittedEmail: string) => {
     setEmail(submittedEmail);
@@ -83,15 +81,11 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
       if (type === 'existing') {
         // Existing user - save auth and go directly to app
         await AuthStorage.saveAuth('oauth_token_' + provider, 'oauth@user.com', false);
-        setStep('complete');
-        setTimeout(() => {
-          onComplete();
-        }, 1500);
+        onComplete();
       } else {
-        // New user - save auth and show splash screen first
+        // New user - save auth and show welcome screen
         await AuthStorage.saveAuth('oauth_token_' + provider, 'oauth@user.com', true);
-        setShowSplashForNewUser(true);
-        setStep('splash');
+        setStep('welcome');
       }
     } catch (err) {
       setError('Authentication failed. Please try again.');
@@ -110,9 +104,8 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
         if (result.success) {
           // Save auth state for new user
           await AuthStorage.saveAuth('token_' + Date.now(), email, true);
-          // Show splash screen for new user
-          setShowSplashForNewUser(true);
-          setStep('splash');
+          // Show welcome screen for new user
+          setStep('welcome');
         } else {
           setError('Account creation failed. Please try again.');
         }
@@ -121,10 +114,7 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
         if (result.success) {
           // Save auth state for existing user
           await AuthStorage.saveAuth('token_' + Date.now(), email, false);
-          setStep('complete');
-          setTimeout(() => {
-            onComplete();
-          }, 1500);
+          onComplete();
         } else {
           setError('Incorrect password. Please try again.');
         }
@@ -151,63 +141,35 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
     }, 3000);
   };
 
-  const handleSplashComplete = () => {
-    // After splash, show welcome screen for new users
-    if (userType === 'new') {
-      setStep('welcome');
-    } else {
-      setStep('complete');
-      setTimeout(() => {
-        onComplete();
-      }, 1500);
-    }
-  };
-
   const handleWelcomeComplete = () => {
-    setStep('complete');
-    setTimeout(() => {
-      onComplete();
-    }, 1500);
+    onComplete();
   };
 
   return (
     <View style={styles.container}>
-      {step === 'splash' && showSplashForNewUser ? (
-        <SplashScreen onComplete={handleSplashComplete} />
-      ) : (
-        <>
-          <AmbientBackground />
+      <AmbientBackground />
 
-          {step === 'entry' && (
-            <EntryScreen
-              onEmailSubmit={handleEmailSubmit}
-              onOAuthPress={handleOAuthPress}
-              loading={loading}
-            />
-          )}
+      {step === 'entry' && (
+        <EntryScreen
+          onEmailSubmit={handleEmailSubmit}
+          onOAuthPress={handleOAuthPress}
+          loading={loading}
+        />
+      )}
 
-          {step === 'password' && userType && (
-            <PasswordScreen
-              email={email}
-              userType={userType}
-              onPasswordSubmit={handlePasswordSubmit}
-              onBack={handleBack}
-              onForgotPassword={handleForgotPassword}
-              loading={loading}
-            />
-          )}
+      {step === 'password' && userType && (
+        <PasswordScreen
+          email={email}
+          userType={userType}
+          onPasswordSubmit={handlePasswordSubmit}
+          onBack={handleBack}
+          onForgotPassword={handleForgotPassword}
+          loading={loading}
+        />
+      )}
 
-          {step === 'welcome' && (
-            <WelcomeScreen onEnter={handleWelcomeComplete} />
-          )}
-
-          {step === 'complete' && (
-            <View style={styles.completeContainer}>
-              <Text style={styles.completeText}>Entering your space…</Text>
-              <ActivityIndicator size="large" color={AuthColors.primary} style={{ marginTop: 24 }} />
-            </View>
-          )}
-        </>
+      {step === 'welcome' && (
+        <WelcomeScreen onEnter={handleWelcomeComplete} />
       )}
 
       {error && (
@@ -223,18 +185,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: AuthColors.background,
-  },
-  completeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  completeText: {
-    fontSize: AuthTypography.fontSize.lg,
-    fontWeight: AuthTypography.fontWeight.light,
-    color: AuthColors.foreground,
-    textAlign: 'center',
   },
   errorContainer: {
     position: 'absolute',

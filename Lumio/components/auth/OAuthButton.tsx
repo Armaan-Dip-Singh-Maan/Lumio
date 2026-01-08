@@ -1,12 +1,12 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, View, Image } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
   withSpring,
 } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
+import { MaterialIcons } from '@expo/vector-icons';
 import { AuthColors } from '@/constants/auth-theme';
 
 interface OAuthButtonProps {
@@ -35,15 +35,15 @@ export function OAuthButton({ provider, onPress, loading = false }: OAuthButtonP
   const providerConfig = {
     apple: {
       label: 'Continue with Apple',
-      icon: '🍎',
-      bgColor: '#000000',
-      textColor: '#FFFFFF',
+      bgColor: '#FFFFFF',
+      textColor: '#000000',
+      borderColor: '#E5E5E5',
     },
     google: {
       label: 'Continue with Google',
-      icon: 'G',
       bgColor: '#FFFFFF',
-      textColor: '#1F1F1F',
+      textColor: '#000000',
+      borderColor: '#E5E5E5',
     },
   }[provider];
 
@@ -59,6 +59,7 @@ export function OAuthButton({ provider, onPress, loading = false }: OAuthButtonP
           styles.button,
           {
             backgroundColor: providerConfig.bgColor,
+            borderColor: providerConfig.borderColor,
             opacity: loading ? 0.6 : 1,
           },
         ]}
@@ -70,9 +71,23 @@ export function OAuthButton({ provider, onPress, loading = false }: OAuthButtonP
           />
         ) : (
           <>
-            <Text style={[styles.icon, { color: providerConfig.textColor }]}>
-              {providerConfig.icon}
-            </Text>
+            {provider === 'apple' ? (
+              <View style={styles.appleIconContainer}>
+                <Image
+                  source={require('../../assets/images/Apple_logo.png')}
+                  style={styles.appleLogo}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : (
+              <View style={styles.googleIconContainer}>
+                <Image
+                  source={require('../../assets/images/Google_logo.png')}
+                  style={styles.googleLogo}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
             <Text style={[styles.label, { color: providerConfig.textColor }]}>
               {providerConfig.label}
             </Text>
@@ -90,23 +105,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 16,
+    borderRadius: 12,
+    borderWidth: 1,
     marginBottom: 12,
     minHeight: 56,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  icon: {
-    fontSize: 20,
+  appleIconContainer: {
     marginRight: 12,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appleLogo: {
+    width: 20,
+    height: 20,
+  },
+  googleIconContainer: {
+    marginRight: 12,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleLogo: {
+    width: 20,
+    height: 20,
   },
   label: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '700',
     letterSpacing: 0.2,
+    color: '#000000',
   },
 });
 
