@@ -171,7 +171,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
           android_ripple={{ color: 'rgba(255,255,255,0.3)' }}
         >
           <View style={styles.centerButtonInner}>
-            <IconSymbol name="plus" size={26} color="#FFFFFF" />
+            <IconSymbol name="plus" size={24} color="rgba(255, 255, 255, 0.95)" />
           </View>
         </Pressable>
       </View>
@@ -257,33 +257,33 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   centerButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#86AFA0',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'hsla(163, 20%, 50%, 0.9)', // Slightly less saturated, more muted
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#86AFA0',
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 10,
+        elevation: 6,
       },
     }),
   },
   centerButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#86AFA0',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
 });
 

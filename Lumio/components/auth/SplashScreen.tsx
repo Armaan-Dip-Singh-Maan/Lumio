@@ -25,6 +25,15 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
   
   // Breathing animation - slow, gentle expansion and contraction
   useEffect(() => {
+    // Start breathing animation - slightly faster
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.15, {
+          duration: 2500, // 2.5 seconds to expand (inhale) - slightly faster
+          easing: Easing.inOut(Easing.ease),
+        }),
+        withTiming(1, {
+          duration: 2500, // 2.5 seconds to contract (exhale) - slightly faster
     // Start breathing animation
     scale.value = withRepeat(
       withSequence(
@@ -41,6 +50,24 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       false
     );
     
+    // Fade in the circle - slightly faster
+    opacity.value = withTiming(1, {
+      duration: 800, // Slightly faster
+      easing: Easing.out(Easing.ease),
+    });
+    
+    // Fade in text during exhale phase (after first cycle) - slightly faster
+    setTimeout(() => {
+      textOpacity.value = withTiming(1, {
+        duration: 1500, // Slightly faster
+        easing: Easing.out(Easing.ease),
+      });
+    }, 2500); // Start fading in text during the first exhale - slightly faster
+    
+    // Navigate after showing splash for a bit - slightly faster
+    const timer = setTimeout(() => {
+      onComplete();
+    }, 5000); // Show splash for 5 seconds - slightly faster
     // Fade in the circle
     opacity.value = withTiming(1, {
       duration: 1000,

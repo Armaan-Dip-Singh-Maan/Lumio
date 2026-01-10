@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { AmbientBackground } from './ambient/AmbientBackground';
 import { EntryScreen } from './EntryScreen';
 import { PasswordScreen } from './PasswordScreen';
@@ -8,6 +8,7 @@ import { SplashScreen } from './SplashScreen';
 import { AuthColors, AuthTypography } from '@/constants/auth-theme';
 import { AuthStorage } from '@/utils/auth-storage';
 
+type AuthStep = 'entry' | 'password' | 'welcome';
 type AuthStep = 'splash' | 'entry' | 'password' | 'welcome' | 'complete';
 type UserType = 'new' | 'existing' | null;
 
@@ -83,6 +84,11 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
       if (type === 'existing') {
         // Existing user - save auth and go directly to app
         await AuthStorage.saveAuth('oauth_token_' + provider, 'oauth@user.com', false);
+        onComplete();
+      } else {
+        // New user - save auth and show welcome screen
+        await AuthStorage.saveAuth('oauth_token_' + provider, 'oauth@user.com', true);
+        setStep('welcome');
         setStep('complete');
         setTimeout(() => {
           onComplete();
@@ -110,6 +116,8 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
         if (result.success) {
           // Save auth state for new user
           await AuthStorage.saveAuth('token_' + Date.now(), email, true);
+          // Show welcome screen for new user
+          setStep('welcome');
           // Show splash screen for new user
           setShowSplashForNewUser(true);
           setStep('splash');
@@ -121,6 +129,7 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
         if (result.success) {
           // Save auth state for existing user
           await AuthStorage.saveAuth('token_' + Date.now(), email, false);
+          onComplete();
           setStep('complete');
           setTimeout(() => {
             onComplete();
@@ -164,10 +173,7 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
   };
 
   const handleWelcomeComplete = () => {
-    setStep('complete');
-    setTimeout(() => {
-      onComplete();
-    }, 1500);
+    onComplete();
   };
 
   return (
@@ -223,18 +229,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: AuthColors.background,
-  },
-  completeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  completeText: {
-    fontSize: AuthTypography.fontSize.lg,
-    fontWeight: AuthTypography.fontWeight.light,
-    color: AuthColors.foreground,
-    textAlign: 'center',
   },
   errorContainer: {
     position: 'absolute',
