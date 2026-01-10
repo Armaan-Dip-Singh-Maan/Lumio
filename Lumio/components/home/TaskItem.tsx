@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -26,15 +26,22 @@ const priorityColors = {
 
 export function TaskItem({ id, title, priority, completed = false, onToggleComplete }: TaskItemProps) {
   const scale = useSharedValue(1);
-  const opacity = useSharedValue(completed ? 0.6 : 1);
+  const opacity = useSharedValue(completed ? 0.55 : 1);
 
-  React.useEffect(() => {
-    opacity.value = withTiming(completed ? 0.6 : 1, { duration: 300 });
+  useEffect(() => {
+    if (completed) {
+      opacity.value = withTiming(0.55, { duration: 300 });
+      scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
+    } else {
+      opacity.value = withTiming(1, { duration: 300 });
+      scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completed]);
 
   const handlePress = () => {
-    scale.value = withSpring(0.95, { damping: 15, stiffness: 300 }, () => {
-      scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    scale.value = withSpring(0.96, { damping: 15, stiffness: 300 }, () => {
+      scale.value = withSpring(completed ? 0.98 : 1, { damping: 15, stiffness: 300 });
     });
     onToggleComplete(id);
   };
@@ -95,10 +102,11 @@ const styles = StyleSheet.create({
     color: HomeColors.foreground,
     letterSpacing: HomeTypography.letterSpacing,
     lineHeight: HomeTypography.fontSize.base * HomeTypography.lineHeight.normal,
+    opacity: 0.95,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
-    opacity: 0.6,
+    opacity: 0.5,
   },
   checkbox: {
     width: 24,

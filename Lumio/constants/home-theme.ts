@@ -11,7 +11,7 @@ export const HomeColors = {
   cardShadow: 'hsla(0, 0%, 0%, 0.15)', // Subtle shadow
   primary: 'hsl(163, 20%, 60%)', // Sage green
   primaryForeground: 'hsl(30, 8%, 8%)',
-  muted: 'hsl(40, 10%, 55%)', // Muted text
+  muted: 'hsl(40, 10%, 58%)', // Muted text (slightly brighter for readability)
   border: 'hsl(30, 6%, 20%)',
   
   // Priority colors (muted, never aggressive)
@@ -19,10 +19,10 @@ export const HomeColors = {
   priorityMedium: 'hsl(40, 50%, 60%)', // Warm amber
   priorityLow: 'hsl(163, 15%, 50%)', // Sage / cool gray
   
-  // Glass effect
-  glassBackground: 'hsla(30, 6%, 14%, 0.7)',
-  glassBorder: 'hsla(40, 10%, 25%, 0.3)',
-  glassShadow: '0 8px 32px -8px hsla(0, 0%, 0%, 0.2)',
+  // Glass effect (slightly brighter for better separation)
+  glassBackground: 'hsla(30, 6%, 16%, 0.75)',
+  glassBorder: 'hsla(40, 10%, 28%, 0.4)',
+  glassShadow: '0 8px 32px -8px hsla(0, 0%, 0%, 0.25)',
 } as const;
 
 export const HomeSpacing = {

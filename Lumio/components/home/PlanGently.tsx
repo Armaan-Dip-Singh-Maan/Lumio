@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
+  withDelay,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -26,6 +28,14 @@ interface PlanGentlyProps {
 
 export function PlanGently({ tasks, onToggleTask, onAddTask, onViewAll }: PlanGentlyProps) {
   const scale = useSharedValue(1);
+  const translateY = useSharedValue(6);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    opacity.value = withDelay(100, withTiming(1, { duration: 600 }));
+    translateY.value = withSpring(0, { damping: 20, stiffness: 300 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePressIn = () => {
     scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
@@ -36,7 +46,8 @@ export function PlanGently({ tasks, onToggleTask, onAddTask, onViewAll }: PlanGe
   };
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ scale: scale.value }, { translateY: translateY.value }],
+    opacity: opacity.value,
   }));
 
   const displayTasks = tasks.slice(0, 3);
@@ -44,34 +55,46 @@ export function PlanGently({ tasks, onToggleTask, onAddTask, onViewAll }: PlanGe
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Plan gently</Text>
-        <Text style={styles.subtitle}>One small step is enough.</Text>
-      </View>
+      {displayTasks.length > 0 && (
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title}>Plan gently</Text>
+            <Text style={styles.subtitle}>One small step is enough.</Text>
+          </View>
+          <TouchableOpacity
+            onPress={onAddTask}
+            style={styles.headerAddButton}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              name={'plus' as 'plus'}
+              size={18}
+              color={HomeColors.muted}
+            />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Animated.View style={animatedStyle}>
         <BlurView intensity={24} tint="dark" style={styles.card}>
           {displayTasks.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>
-                If you'd like, add a small task.
-              </Text>
-              <Animated.View style={animatedStyle}>
-                <TouchableOpacity
-                  onPress={onAddTask}
-                  onPressIn={handlePressIn}
-                  onPressOut={handlePressOut}
-                  style={styles.addButton}
-                  activeOpacity={0.8}
-                >
-                  <IconSymbol
-                    name={'plus' as 'plus'}
-                    size={20}
-                    color={HomeColors.muted}
-                  />
-                  <Text style={styles.addButtonText}>Add a task</Text>
-                </TouchableOpacity>
-              </Animated.View>
+              <Text style={styles.emptyTitle}>Plan gently</Text>
+              <Text style={styles.emptySubtitle}>One small step is enough.</Text>
+              <TouchableOpacity
+                onPress={onAddTask}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                style={styles.emptyAddButton}
+                activeOpacity={0.8}
+              >
+                <IconSymbol
+                  name={'plus' as 'plus'}
+                  size={20}
+                  color={HomeColors.muted}
+                />
+                <Text style={styles.addButtonText}>Add a task</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.tasksContainer}>
@@ -109,7 +132,13 @@ const styles = StyleSheet.create({
     marginBottom: HomeSpacing.xl,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: HomeSpacing.md,
+  },
+  headerLeft: {
+    flex: 1,
   },
   title: {
     fontSize: HomeTypography.fontSize.xl,
@@ -123,6 +152,17 @@ const styles = StyleSheet.create({
     fontWeight: HomeTypography.fontWeight.light,
     color: HomeColors.muted,
     letterSpacing: HomeTypography.letterSpacing,
+    opacity: 0.85,
+  },
+  headerAddButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: HomeColors.glassBackground,
+    borderWidth: 1,
+    borderColor: HomeColors.glassBorder,
     opacity: 0.8,
   },
   card: {
@@ -136,21 +176,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 16,
     elevation: 2,
+    minHeight: 120,
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: HomeSpacing.xl,
+    paddingVertical: HomeSpacing.lg,
   },
-  emptyText: {
-    fontSize: HomeTypography.fontSize.base,
+  emptyTitle: {
+    fontSize: HomeTypography.fontSize.xl,
+    fontWeight: HomeTypography.fontWeight.light,
+    color: HomeColors.foreground,
+    letterSpacing: HomeTypography.letterSpacing,
+    marginBottom: HomeSpacing.xs / 2,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: HomeTypography.fontSize.sm,
     fontWeight: HomeTypography.fontWeight.light,
     color: HomeColors.muted,
+    letterSpacing: HomeTypography.letterSpacing,
     textAlign: 'center',
     marginBottom: HomeSpacing.lg,
-    letterSpacing: HomeTypography.letterSpacing,
+    opacity: 0.85,
   },
-  addButton: {
+  emptyAddButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: HomeSpacing.md,

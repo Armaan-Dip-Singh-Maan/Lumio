@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
+import { getGreeting, getFormattedDate } from '@/utils/get-greeting';
 
 interface TopBarProps {
   onProfilePress?: () => void;
@@ -10,10 +11,17 @@ interface TopBarProps {
 
 export function TopBar({ onProfilePress }: TopBarProps) {
   const insets = useSafeAreaInsets();
+  const greeting = getGreeting();
+  const date = getFormattedDate();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.logo}>Lumio</Text>
+      <View style={styles.leftSection}>
+        <Text style={styles.logo}>Lumio</Text>
+        <Text style={styles.greetingDate}>
+          {greeting} • {date}
+        </Text>
+      </View>
       <TouchableOpacity
         onPress={onProfilePress}
         style={styles.profileButton}
@@ -35,13 +43,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: HomeSpacing.md,
-    paddingBottom: HomeSpacing.sm,
+    paddingBottom: HomeSpacing.md,
+  },
+  leftSection: {
+    flex: 1,
   },
   logo: {
     fontSize: HomeTypography.fontSize.base,
     fontWeight: HomeTypography.fontWeight.light,
+    color: HomeColors.foreground,
+    letterSpacing: HomeTypography.letterSpacing,
+    marginBottom: 2,
+  },
+  greetingDate: {
+    fontSize: HomeTypography.fontSize.xs,
+    fontWeight: HomeTypography.fontWeight.light,
     color: HomeColors.muted,
     letterSpacing: HomeTypography.letterSpacing,
+    opacity: 0.75,
   },
   profileButton: {
     width: 36,

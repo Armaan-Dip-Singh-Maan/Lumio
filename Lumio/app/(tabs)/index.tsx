@@ -83,7 +83,7 @@ export default function HomeScreen() {
           style={styles.scrollView}
           contentContainerStyle={[
             styles.contentContainer,
-            { paddingBottom: insets.bottom + 32 },
+            { paddingBottom: insets.bottom + 100 }, // Extra padding to avoid nav overlap
           ]}
           showsVerticalScrollIndicator={false}
         >
