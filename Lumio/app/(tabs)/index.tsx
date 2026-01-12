@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -21,6 +22,7 @@ const mockTasks: Task[] = [
 ];
 
 export default function HomeScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [hasEntryToday, setHasEntryToday] = useState(false);
@@ -46,9 +48,7 @@ export default function HomeScreen() {
   }));
 
   const handleWritePress = () => {
-    // Navigate to journal entry screen
-    console.log('Open journal entry');
-    // router.push('/journal/new');
+    router.push('/journal-write');
   };
 
   const handleToggleTask = (id: string) => {
