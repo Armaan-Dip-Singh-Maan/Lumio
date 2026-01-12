@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { AmbientBackground } from './ambient/AmbientBackground';
 import { EntryScreen } from './EntryScreen';
 import { PasswordScreen } from './PasswordScreen';
 import { WelcomeScreen } from './WelcomeScreen';
+import { SplashScreen } from './SplashScreen';
 import { AuthColors, AuthTypography } from '@/constants/auth-theme';
 import { AuthStorage } from '@/utils/auth-storage';
 
-type AuthStep = 'entry' | 'password' | 'welcome';
+type AuthStep = 'splash' | 'entry' | 'password' | 'welcome' | 'complete';
 type UserType = 'new' | 'existing' | null;
 
 interface AuthFlowProps {
@@ -53,6 +54,7 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSplashForNewUser, setShowSplashForNewUser] = useState(false);
 
   const handleEmailSubmit = async (submittedEmail: string) => {
     setEmail(submittedEmail);
@@ -83,9 +85,10 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
         await AuthStorage.saveAuth('oauth_token_' + provider, 'oauth@user.com', false);
         onComplete();
       } else {
-        // New user - save auth and show welcome screen
+        // New user - save auth and show splash screen first
         await AuthStorage.saveAuth('oauth_token_' + provider, 'oauth@user.com', true);
-        setStep('welcome');
+        setShowSplashForNewUser(true);
+        setStep('splash');
       }
     } catch (err) {
       setError('Authentication failed. Please try again.');
@@ -104,8 +107,9 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
         if (result.success) {
           // Save auth state for new user
           await AuthStorage.saveAuth('token_' + Date.now(), email, true);
-          // Show welcome screen for new user
-          setStep('welcome');
+          // Show splash screen for new user
+          setShowSplashForNewUser(true);
+          setStep('splash');
         } else {
           setError('Account creation failed. Please try again.');
         }
@@ -141,35 +145,60 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
     }, 3000);
   };
 
+  const handleSplashComplete = () => {
+    // After splash, show welcome screen for new users
+    if (userType === 'new') {
+      setStep('welcome');
+    } else {
+      setStep('complete');
+      setTimeout(() => {
+        onComplete();
+      }, 1500);
+    }
+  };
+
   const handleWelcomeComplete = () => {
     onComplete();
   };
 
   return (
     <View style={styles.container}>
-      <AmbientBackground />
+      {step === 'splash' && showSplashForNewUser ? (
+        <SplashScreen onComplete={handleSplashComplete} />
+      ) : (
+        <>
+          <AmbientBackground />
 
-      {step === 'entry' && (
-        <EntryScreen
-          onEmailSubmit={handleEmailSubmit}
-          onOAuthPress={handleOAuthPress}
-          loading={loading}
-        />
-      )}
+          {step === 'entry' && (
+            <EntryScreen
+              onEmailSubmit={handleEmailSubmit}
+              onOAuthPress={handleOAuthPress}
+              loading={loading}
+            />
+          )}
 
-      {step === 'password' && userType && (
-        <PasswordScreen
-          email={email}
-          userType={userType}
-          onPasswordSubmit={handlePasswordSubmit}
-          onBack={handleBack}
-          onForgotPassword={handleForgotPassword}
-          loading={loading}
-        />
-      )}
+          {step === 'password' && userType && (
+            <PasswordScreen
+              email={email}
+              userType={userType}
+              onPasswordSubmit={handlePasswordSubmit}
+              onBack={handleBack}
+              onForgotPassword={handleForgotPassword}
+              loading={loading}
+            />
+          )}
 
-      {step === 'welcome' && (
-        <WelcomeScreen onEnter={handleWelcomeComplete} />
+          {step === 'welcome' && (
+            <WelcomeScreen onEnter={handleWelcomeComplete} />
+          )}
+
+          {step === 'complete' && (
+            <View style={styles.completeContainer}>
+              <Text style={styles.completeText}>Entering your space…</Text>
+              <ActivityIndicator size="large" color={AuthColors.primary} style={{ marginTop: 24 }} />
+            </View>
+          )}
+        </>
       )}
 
       {error && (
@@ -185,6 +214,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: AuthColors.background,
+  },
+  completeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  completeText: {
+    fontSize: AuthTypography.fontSize.lg,
+    color: AuthColors.foreground,
+    textAlign: 'center',
   },
   errorContainer: {
     position: 'absolute',

@@ -48,7 +48,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     });
     
     // Fade in text during exhale phase (after first cycle) - slightly faster
-    setTimeout(() => {
+    const textTimer = setTimeout(() => {
       textOpacity.value = withTiming(1, {
         duration: 1500, // Slightly faster
         easing: Easing.out(Easing.ease),
@@ -56,12 +56,15 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     }, 2500); // Start fading in text during the first exhale - slightly faster
     
     // Navigate after showing splash for a bit - slightly faster
-    const timer = setTimeout(() => {
+    const navigationTimer = setTimeout(() => {
       onComplete();
     }, 5000); // Show splash for 5 seconds - slightly faster
     
-    return () => clearTimeout(timer);
-  }, []);
+    return () => {
+      clearTimeout(textTimer);
+      clearTimeout(navigationTimer);
+    };
+  }, [onComplete]);
   
   // Animated style for breathing circle
   const circleStyle = useAnimatedStyle(() => {
