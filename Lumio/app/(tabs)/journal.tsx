@@ -174,6 +174,7 @@ export default function JournalScreen() {
             styles.scrollContent,
             { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + HomeSpacing.xl },
           ]}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           {groupedEntries.map((group) => (
