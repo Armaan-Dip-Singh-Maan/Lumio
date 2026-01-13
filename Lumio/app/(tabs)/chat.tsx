@@ -4,10 +4,16 @@ import {
   View,
   Text,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
 import { TAB_BAR_HEIGHT } from '@/constants/navigation';
 import { EmptyState } from '@/components/chat/EmptyState';
@@ -24,6 +30,14 @@ export default function ChatScreen() {
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Calculate resting and active bottom offsets
+  const restingBottom = TAB_BAR_HEIGHT + insets.bottom + 12;
+  const activeBottom = keyboardHeight > 0 ? keyboardHeight + 8 : restingBottom;
+
+  // Animated value for composer bottom offset
+  const composerBottom = useSharedValue(restingBottom);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -43,6 +57,45 @@ export default function ChatScreen() {
       }
     };
   }, []);
+
+  // Keyboard event listeners
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        const height = e.endCoordinates.height;
+        setKeyboardHeight(height);
+        composerBottom.value = withTiming(height + 8, {
+          duration: Platform.OS === 'ios' ? 250 : 300,
+          easing: Easing.out(Easing.ease),
+        });
+      }
+    );
+
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+        const currentRestingBottom = TAB_BAR_HEIGHT + insets.bottom + 12;
+        composerBottom.value = withTiming(currentRestingBottom, {
+          duration: Platform.OS === 'ios' ? 250 : 300,
+          easing: Easing.out(Easing.ease),
+        });
+      }
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [insets.bottom]);
+
+  // Animated style for composer container
+  const composerAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      bottom: composerBottom.value,
+    };
+  });
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
@@ -88,12 +141,13 @@ export default function ChatScreen() {
 
   const showEmptyState = messages.length === 0 && !isTyping;
 
+  // Calculate message list bottom padding
+  const messageListPaddingBottom = keyboardHeight > 0
+    ? 120 + keyboardHeight + 8
+    : 120 + 12 + TAB_BAR_HEIGHT + insets.bottom;
+
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: HomeColors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
-    >
+    <View style={[styles.container, { backgroundColor: HomeColors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16, paddingBottom: 16 }]}>
         <View style={styles.headerContent}>
@@ -108,7 +162,7 @@ export default function ChatScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: 120 + 12 + TAB_BAR_HEIGHT + insets.bottom },
+          { paddingBottom: messageListPaddingBottom },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -129,10 +183,10 @@ export default function ChatScreen() {
       </ScrollView>
 
       {/* Floating Input Bar */}
-      <View style={[styles.inputBarContainer, { bottom: TAB_BAR_HEIGHT + insets.bottom + 12 }]}>
+      <Animated.View style={[styles.inputBarContainer, composerAnimatedStyle]}>
         <InputBar onSend={handleSend} disabled={isTyping} />
-      </View>
-    </KeyboardAvoidingView>
+      </Animated.View>
+    </View>
   );
 }
 
