@@ -154,8 +154,8 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             {leftRoutes.map((route, index) => renderTab(route, index, index))}
           </View>
 
-          {/* Center spacer for button */}
-          <View style={styles.centerSpacer} />
+          {/* Center spacer for button - only when center button is visible */}
+          {!isChatScreen && <View style={styles.centerSpacer} />}
 
           {/* Right side tabs */}
           <View style={styles.rightTabs}>

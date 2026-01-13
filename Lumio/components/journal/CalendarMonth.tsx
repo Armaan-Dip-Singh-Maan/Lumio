@@ -71,7 +71,7 @@ export function CalendarMonth({
 
   useEffect(() => {
     if (isExpanded) {
-      height.value = withTiming(280, {
+      height.value = withTiming(320, {
         duration: 250,
         easing: Easing.out(Easing.ease),
       });
