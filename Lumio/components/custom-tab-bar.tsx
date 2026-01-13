@@ -99,6 +99,10 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const activeColor = '#2D3748'; // Darker for better contrast
   const inactiveColor = '#808b99'; // Slightly lighter for inactive
 
+  // Check if current active route is 'chat'
+  const activeRoute = state.routes[state.index];
+  const isChatScreen = activeRoute?.name === 'chat';
+
   // Split routes into left and right groups for center button
   const leftRoutes = state.routes.slice(0, 2); // Home, Journal
   const rightRoutes = state.routes.slice(2); // Chat, You
@@ -160,21 +164,23 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         </View>
       </BlurView>
 
-      {/* Center Floating Action Button */}
-      <View style={[styles.centerButtonContainer, { bottom: Math.max(insets.bottom, 8) + 38 }]}>
-        <Pressable
-          style={styles.centerButton}
-          onPress={() => {
-            // Handle center button press - you can navigate to a create screen
-            console.log('Center button pressed');
-          }}
-          android_ripple={{ color: 'rgba(255,255,255,0.3)' }}
-        >
-          <View style={styles.centerButtonInner}>
-            <IconSymbol name="plus" size={24} color="rgba(255, 255, 255, 0.95)" />
-          </View>
-        </Pressable>
-      </View>
+      {/* Center Floating Action Button - Hidden on Chat screen */}
+      {!isChatScreen && (
+        <View style={[styles.centerButtonContainer, { bottom: Math.max(insets.bottom, 8) + 38 }]}>
+          <Pressable
+            style={styles.centerButton}
+            onPress={() => {
+              // Handle center button press - you can navigate to a create screen
+              console.log('Center button pressed');
+            }}
+            android_ripple={{ color: 'rgba(255,255,255,0.3)' }}
+          >
+            <View style={styles.centerButtonInner}>
+              <IconSymbol name="plus" size={24} color="rgba(255, 255, 255, 0.95)" />
+            </View>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }

@@ -9,6 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
+import { TAB_BAR_HEIGHT } from '@/constants/navigation';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { JournalStorage, JournalEntry } from '@/utils/journal-storage';
 import {
@@ -169,6 +170,10 @@ export default function JournalScreen() {
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + HomeSpacing.xl },
+          ]}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
