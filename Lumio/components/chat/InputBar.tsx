@@ -61,14 +61,26 @@ export function InputBar({ onSend, disabled = false }: InputBarProps) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: HomeColors.glassBackground,
-    borderTopWidth: 1,
-    borderTopColor: HomeColors.glassBorder,
-    paddingBottom: Platform.OS === 'ios' ? 0 : HomeSpacing.sm,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: HomeColors.glassBorder,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: HomeSpacing.md,
+    paddingHorizontal: 16,
     paddingVertical: HomeSpacing.sm,
     gap: HomeSpacing.sm,
   },

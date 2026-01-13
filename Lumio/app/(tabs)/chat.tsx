@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
+import { TAB_BAR_HEIGHT } from '@/constants/navigation';
 import { EmptyState } from '@/components/chat/EmptyState';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { MessageBubble, Message } from '@/components/chat/MessageBubble';
@@ -107,7 +108,7 @@ export default function ChatScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + 100 },
+          { paddingBottom: 120 + 12 + TAB_BAR_HEIGHT + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -127,8 +128,8 @@ export default function ChatScreen() {
         )}
       </ScrollView>
 
-      {/* Input Bar */}
-      <View style={{ paddingBottom: insets.bottom }}>
+      {/* Floating Input Bar */}
+      <View style={[styles.inputBarContainer, { bottom: TAB_BAR_HEIGHT + insets.bottom + 12 }]}>
         <InputBar onSend={handleSend} disabled={isTyping} />
       </View>
     </KeyboardAvoidingView>
@@ -170,5 +171,11 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
+  },
+  inputBarContainer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 10,
   },
 });

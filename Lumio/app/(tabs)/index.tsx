@@ -12,7 +12,8 @@ import { TopBar } from '@/components/home/TopBar';
 import { PrimaryJournalCard } from '@/components/home/PrimaryJournalCard';
 import { PlanGently, Task } from '@/components/home/PlanGently';
 import { MoodIndicator } from '@/components/home/MoodIndicator';
-import { HomeColors } from '@/constants/home-theme';
+import { HomeColors, HomeSpacing } from '@/constants/home-theme';
+import { TAB_BAR_HEIGHT } from '@/constants/navigation';
 
 // Mock data - replace with actual data management
 const mockTasks: Task[] = [
@@ -83,7 +84,7 @@ export default function HomeScreen() {
           style={styles.scrollView}
           contentContainerStyle={[
             styles.contentContainer,
-            { paddingBottom: insets.bottom + 100 }, // Extra padding to avoid nav overlap
+            { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + HomeSpacing.xl },
           ]}
           showsVerticalScrollIndicator={false}
         >

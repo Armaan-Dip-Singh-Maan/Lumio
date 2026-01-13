@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
+import { TAB_BAR_HEIGHT } from '@/constants/navigation';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AuthStorage } from '@/utils/auth-storage';
 import { SettingsSection } from '@/components/profile/SettingsSection';
@@ -136,7 +137,7 @@ export default function ProfileScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + HomeSpacing.xl }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + HomeSpacing.xl }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Top Section - Avatar and Email */}
