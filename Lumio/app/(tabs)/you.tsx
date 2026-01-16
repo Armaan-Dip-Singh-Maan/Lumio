@@ -11,10 +11,10 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import { useUser, useClerk } from '@clerk/clerk-expo';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
 import { TAB_BAR_HEIGHT } from '@/constants/navigation';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { AuthStorage } from '@/utils/auth-storage';
 import { SettingsSection } from '@/components/profile/SettingsSection';
 import { SettingsToggle } from '@/components/profile/SettingsToggle';
 import { SettingsSelector } from '@/components/profile/SettingsSelector';
@@ -25,8 +25,9 @@ type TextSize = 'small' | 'default' | 'large';
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user, isLoaded: userLoaded } = useUser();
+  const { signOut } = useClerk();
   
-  const [email, setEmail] = useState<string>('');
   const [theme, setTheme] = useState<Theme>('system');
   const [textSize, setTextSize] = useState<TextSize>('default');
   const [dailyReminder, setDailyReminder] = useState(false);
@@ -36,20 +37,20 @@ export default function ProfileScreen() {
   const [blankPage, setBlankPage] = useState(false);
   const [moodCheckIn, setMoodCheckIn] = useState(false);
 
-  // Load user data
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const userEmail = await AuthStorage.getUserEmail();
-        if (userEmail) {
-          setEmail(userEmail);
-        }
-      } catch (error) {
-        console.error('Error loading user data:', error);
-      }
-    };
-    loadUserData();
-  }, []);
+  // Get user email from Clerk
+  // Use primaryEmailAddress first, fallback to first email in emailAddresses array
+  const userEmail = user?.primaryEmailAddress?.emailAddress || 
+                    user?.emailAddresses?.[0]?.emailAddress || 
+                    null;
+  
+  // Determine login method from user's external accounts
+  const loginMethod = user?.externalAccounts?.length > 0
+    ? user.externalAccounts[0].provider === 'oauth_google' 
+      ? 'Google' 
+      : user.externalAccounts[0].provider === 'oauth_apple'
+      ? 'Apple'
+      : 'OAuth'
+    : 'Email';
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -61,8 +62,15 @@ export default function ProfileScreen() {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
-            await AuthStorage.clearAuth();
-            router.replace('/auth');
+            try {
+              // Use Clerk's signOut method
+              await signOut();
+              // Redirect to auth screen after sign out
+              router.replace('/(auth)');
+            } catch (error) {
+              console.error('Error signing out:', error);
+              Alert.alert('Error', 'Failed to sign out. Please try again.');
+            }
           },
         },
       ]
@@ -79,9 +87,14 @@ export default function ProfileScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            // In production, this would call an API to delete the account
-            await AuthStorage.clearAuth();
-            router.replace('/auth');
+            // In production, this would call an API to delete the account via Clerk
+            try {
+              await signOut();
+              router.replace('/(auth)');
+            } catch (error) {
+              console.error('Error deleting account:', error);
+              Alert.alert('Error', 'Failed to delete account. Please try again.');
+            }
           },
         },
       ]
@@ -149,8 +162,12 @@ export default function ProfileScreen() {
               color={HomeColors.muted}
             />
           </BlurView>
-          {email ? (
-            <Text style={styles.emailText}>{email}</Text>
+          {userLoaded ? (
+            userEmail ? (
+              <Text style={styles.emailText}>{userEmail}</Text>
+            ) : (
+              <Text style={styles.emailText}>No email available</Text>
+            )
           ) : (
             <Text style={styles.emailText}>Loading...</Text>
           )}
@@ -244,11 +261,15 @@ export default function ProfileScreen() {
           <BlurView intensity={20} tint="dark" style={styles.sectionCard}>
             <View style={styles.accountInfo}>
               <Text style={styles.accountLabel}>Email</Text>
-              <Text style={styles.accountValue}>{email || 'Loading...'}</Text>
+              <Text style={styles.accountValue}>
+                {userLoaded 
+                  ? (userEmail || 'No email available')
+                  : 'Loading...'}
+              </Text>
             </View>
             <View style={styles.accountInfo}>
               <Text style={styles.accountLabel}>Login Method</Text>
-              <Text style={styles.accountValue}>Email</Text>
+              <Text style={styles.accountValue}>{loginMethod}</Text>
             </View>
             {renderActionButton('Sign out', handleSignOut)}
             <View style={styles.separator} />

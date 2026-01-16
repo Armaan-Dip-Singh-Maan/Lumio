@@ -1,27 +1,45 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useAuth } from '@clerk/clerk-expo';
 import { SplashScreen } from '@/components/auth/SplashScreen';
-import { AuthStorage } from '@/utils/auth-storage';
 
 export default function InitialScreen() {
   const router = useRouter();
+  const { isSignedIn, isLoaded } = useAuth();
 
-  const handleSplashComplete = async () => {
-    try {
-      const isLoggedIn = await AuthStorage.isLoggedIn();
-      
-      if (isLoggedIn) {
-        // User is already logged in - go directly to home
-        router.replace('/(tabs)');
-      } else {
-        // User is not logged in - go to auth flow
-        router.replace('/auth');
-      }
-    } catch (error) {
-      // On error, go to auth flow
-      router.replace('/auth');
+  const handleSplashComplete = () => {
+    // Wait for Clerk to finish loading
+    if (!isLoaded) {
+      // If not loaded yet, wait a bit and check again
+      setTimeout(handleSplashComplete, 100);
+      return;
+    }
+
+    if (isSignedIn) {
+      // User is already signed in - go directly to home
+      router.replace('/(tabs)');
+    } else {
+      // User is not signed in - go to auth flow
+      router.replace('/(auth)');
     }
   };
+
+  // Check auth state when Clerk loads and redirect accordingly
+  // This prevents redirect loops by ensuring we only redirect once when loaded
+  useEffect(() => {
+    if (isLoaded) {
+      // Small delay to ensure navigation is ready
+      const timer = setTimeout(() => {
+        if (isSignedIn) {
+          router.replace('/(tabs)');
+        } else {
+          router.replace('/(auth)');
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isLoaded, isSignedIn, router]);
 
   return <SplashScreen onComplete={handleSplashComplete} />;
 }
