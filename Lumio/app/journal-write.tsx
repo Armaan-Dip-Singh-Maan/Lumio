@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -35,7 +35,7 @@ function getJournalDateString(): string {
   return `${dayName} · ${monthName} ${day}`;
 }
 
-// Get time of day context (e.g., "Late evening")
+// Get time of day context (e.g., "Evening")
 function getTimeOfDayContext(): string | null {
   const hour = new Date().getHours();
   
@@ -64,21 +64,20 @@ export default function JournalWriteScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const textInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
   
   const [content, setContent] = useState('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | null>(null);
   const [entryId, setEntryId] = useState<string | null>(null);
   const [createdAt, setCreatedAt] = useState<number | null>(null);
-  const [hasStartedTyping, setHasStartedTyping] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   const saveStatusOpacity = useSharedValue(0);
-  const entryCardOpacity = useSharedValue(1);
-  const entryCardTranslateY = useSharedValue(0);
   const containerOpacity = useSharedValue(0);
   const containerTranslateY = useSharedValue(8);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fade up animation on entry
+  // Fade up animation on mount
   useEffect(() => {
     containerOpacity.value = withTiming(1, {
       duration: 400,
@@ -110,14 +109,6 @@ export default function JournalWriteScreen() {
           setContent(entry.content);
           setEntryId(entry.id);
           setCreatedAt(entry.createdAt);
-          setHasStartedTyping(entry.content.length > 0);
-          // Fade out entry card if content exists
-          if (entry.content.length > 0) {
-            entryCardOpacity.value = withTiming(0.3, {
-              duration: 300,
-              easing: Easing.out(Easing.ease),
-            });
-          }
         }
       } catch (error) {
         console.error('Error loading entry:', error);
@@ -176,28 +167,25 @@ export default function JournalWriteScreen() {
   // Handle text change
   const handleTextChange = (text: string) => {
     setContent(text);
-    
-    // Fade entry card when user starts typing
-    if (!hasStartedTyping && text.length > 0) {
-      setHasStartedTyping(true);
-      entryCardOpacity.value = withTiming(0.3, {
-        duration: 400,
-        easing: Easing.out(Easing.ease),
-      });
-    } else if (hasStartedTyping && text.length === 0) {
-      setHasStartedTyping(false);
-      entryCardOpacity.value = withTiming(1, {
-        duration: 400,
-        easing: Easing.out(Easing.ease),
-      });
-    }
-    
     saveEntry(text);
   };
 
   // Handle back press
   const handleBack = useCallback(async () => {
     // Clear any pending saves and save immediately
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    if (content.trim()) {
+      await saveEntry(content);
+    }
+    
+    router.back();
+  }, [content, saveEntry, router]);
+
+  // Handle save/done
+  const handleDone = useCallback(async () => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -226,14 +214,12 @@ export default function JournalWriteScreen() {
     transform: [{ translateY: containerTranslateY.value }],
   }));
   
-  const entryCardAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: entryCardOpacity.value,
-    transform: [{ translateY: entryCardTranslateY.value }],
-  }));
-  
   const saveStatusAnimatedStyle = useAnimatedStyle(() => ({
     opacity: saveStatusOpacity.value,
   }));
+
+  // Paper page colors - warm gray with subtle gradient
+  const paperBackground = 'hsl(30, 6%, 12%)'; // Slightly lighter than background
 
   return (
     <KeyboardAvoidingView
@@ -242,8 +228,8 @@ export default function JournalWriteScreen() {
       keyboardVerticalOffset={0}
     >
       <Animated.View style={[styles.contentContainer, containerAnimatedStyle]}>
-        {/* Top Bar */}
-        <View style={[styles.topBar, { paddingTop: insets.top + 16, paddingBottom: 16 }]}>
+        {/* Custom Top Bar */}
+        <View style={[styles.topBar, { paddingTop: insets.top + 12, paddingBottom: 12 }]}>
           <TouchableOpacity
             onPress={handleBack}
             style={styles.backButton}
@@ -252,7 +238,7 @@ export default function JournalWriteScreen() {
           >
             <IconSymbol
               name={'chevron.left' as 'chevron.left'}
-              size={22}
+              size={20}
               color={HomeColors.muted}
             />
           </TouchableOpacity>
@@ -264,51 +250,77 @@ export default function JournalWriteScreen() {
             )}
           </View>
 
-          <Animated.View style={[styles.saveStatusContainer, saveStatusAnimatedStyle]}>
-            <Text style={styles.saveStatusText}>Saved</Text>
-          </Animated.View>
+          <View style={styles.doneButton}>
+            {saveStatus === 'saved' ? (
+              <Animated.View style={saveStatusAnimatedStyle}>
+                <Text style={styles.doneButtonText}>Saved</Text>
+              </Animated.View>
+            ) : (
+              <TouchableOpacity
+                onPress={handleDone}
+                activeOpacity={0.6}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
+        {/* Paper Page Container */}
         <ScrollView 
+          ref={scrollViewRef}
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 24 }
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Gentle Entry Card */}
-          <Animated.View 
-            style={[styles.entryCardContainer, entryCardAnimatedStyle]}
-            pointerEvents="none"
-          >
-            <BlurView intensity={20} tint="dark" style={styles.entryCardBlur}>
-              <View style={styles.entryCardContent}>
-                <Text style={styles.entryCardTitle}>Take a breath.</Text>
-                <Text style={styles.entryCardPrompt}>What's on your mind right now?</Text>
+          <View style={styles.pageContainer}>
+            {/* Paper Surface with gradient and shadow */}
+            <LinearGradient
+              colors={[
+                paperBackground,
+                `${paperBackground}dd`,
+                paperBackground,
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.paperSurface}
+            >
+              {/* Prompt Header */}
+              <View style={styles.promptHeader}>
+                <Text style={styles.promptTitle}>Take a breath.</Text>
+                <Text style={styles.promptSubtitle}>What's on your mind right now?</Text>
+                <Text style={styles.promptHelper}>One sentence is enough.</Text>
               </View>
-            </BlurView>
-          </Animated.View>
 
-          {/* Writing Area */}
-          <View style={styles.writingContainer}>
-            <TextInput
-              ref={textInputRef}
-              style={styles.textInput}
-              value={content}
-              onChangeText={handleTextChange}
-              placeholder="One sentence is enough."
-              placeholderTextColor={HomeColors.muted}
-              multiline
-              autoFocus={!content}
-              textAlignVertical="top"
-              selectionColor={HomeColors.primary}
-            />
+              {/* Writing Area */}
+              <View style={styles.writingArea}>
+                {!content && (
+                  <View style={styles.placeholderContainer} pointerEvents="none">
+                    <Text style={styles.placeholderText}>Start writing...</Text>
+                  </View>
+                )}
+                <TextInput
+                  ref={textInputRef}
+                  style={styles.textInput}
+                  value={content}
+                  onChangeText={handleTextChange}
+                  placeholder=""
+                  placeholderTextColor="transparent"
+                  multiline
+                  autoFocus={!content}
+                  textAlignVertical="top"
+                  selectionColor={HomeColors.primary}
+                  cursorColor={HomeColors.primary}
+                />
+              </View>
+            </LinearGradient>
           </View>
         </ScrollView>
-
-        {/* Safety Anchor */}
-        <View style={[styles.safetyAnchor, { paddingBottom: insets.bottom + 16 }]}>
-          <Text style={styles.safetyAnchorText}>Your thoughts are private.</Text>
-        </View>
       </Animated.View>
     </KeyboardAvoidingView>
   );
@@ -326,10 +338,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: HomeSpacing.md,
+    backgroundColor: HomeColors.background,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
     opacity: 0.8,
@@ -343,26 +356,27 @@ const styles = StyleSheet.create({
     fontWeight: HomeTypography.fontWeight.light,
     color: HomeColors.muted,
     letterSpacing: HomeTypography.letterSpacing,
-    opacity: 0.75,
+    opacity: 0.7,
   },
   timeContextText: {
     fontSize: HomeTypography.fontSize.xs,
     fontWeight: HomeTypography.fontWeight.light,
     color: HomeColors.muted,
     letterSpacing: HomeTypography.letterSpacing,
-    opacity: 0.6,
+    opacity: 0.5,
     marginTop: 2,
   },
-  saveStatusContainer: {
-    width: 60,
+  doneButton: {
+    minWidth: 50,
     alignItems: 'flex-end',
+    paddingVertical: 4,
   },
-  saveStatusText: {
-    fontSize: HomeTypography.fontSize.xs,
-    fontWeight: HomeTypography.fontWeight.light,
-    color: HomeColors.muted,
+  doneButtonText: {
+    fontSize: HomeTypography.fontSize.sm,
+    fontWeight: HomeTypography.fontWeight.medium,
+    color: HomeColors.primary,
     letterSpacing: HomeTypography.letterSpacing,
-    opacity: 0.7,
+    opacity: 0.9,
   },
   scrollView: {
     flex: 1,
@@ -370,66 +384,91 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: HomeSpacing.md,
+    paddingTop: HomeSpacing.lg,
   },
-  entryCardContainer: {
-    marginTop: HomeSpacing.lg,
+  pageContainer: {
+    width: '100%',
+    maxWidth: 600, // Max width for larger screens
+    alignSelf: 'center',
     marginBottom: HomeSpacing.xl,
-    borderRadius: 20,
-    overflow: 'hidden',
   },
-  entryCardBlur: {
-    backgroundColor: HomeColors.glassBackground,
+  paperSurface: {
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: HomeColors.glassBorder,
+    borderColor: 'hsla(40, 8%, 25%, 0.3)',
+    backgroundColor: 'hsl(30, 6%, 12%)',
+    shadowColor: 'hsla(0, 0%, 0%, 0.4)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+    minHeight: 600,
+    paddingTop: 32,
+    paddingBottom: 48,
+    paddingHorizontal: 24,
+    position: 'relative',
   },
-  entryCardContent: {
-    padding: HomeSpacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
+  promptHeader: {
+    marginBottom: 32,
+    paddingTop: 8,
   },
-  entryCardTitle: {
+  promptTitle: {
     fontSize: HomeTypography.fontSize.xl,
-    fontWeight: HomeTypography.fontWeight.light,
+    fontWeight: HomeTypography.fontWeight.medium,
     color: HomeColors.foreground,
     letterSpacing: HomeTypography.letterSpacing,
-    marginBottom: HomeSpacing.sm,
-    textAlign: 'center',
+    marginBottom: 8,
     opacity: 0.95,
   },
-  entryCardPrompt: {
+  promptSubtitle: {
     fontSize: HomeTypography.fontSize.base,
     fontWeight: HomeTypography.fontWeight.light,
     color: HomeColors.muted,
     letterSpacing: HomeTypography.letterSpacing,
-    textAlign: 'center',
-    lineHeight: HomeTypography.fontSize.base * HomeTypography.lineHeight.relaxed,
-    opacity: 0.85,
+    marginBottom: 4,
+    opacity: 0.8,
+    lineHeight: HomeTypography.fontSize.base * HomeTypography.lineHeight.normal,
   },
-  writingContainer: {
-    flex: 1,
-    minHeight: 200,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: HomeTypography.fontSize.lg + 2,
-    fontWeight: HomeTypography.fontWeight.regular,
-    color: HomeColors.foreground,
-    letterSpacing: HomeTypography.letterSpacing,
-    lineHeight: (HomeTypography.fontSize.lg + 2) * HomeTypography.lineHeight.relaxed,
-    paddingTop: 0,
-    paddingBottom: HomeSpacing.xl,
-    opacity: 0.95,
-  },
-  safetyAnchor: {
-    paddingHorizontal: HomeSpacing.md,
-    paddingTop: HomeSpacing.md,
-    alignItems: 'center',
-  },
-  safetyAnchorText: {
-    fontSize: HomeTypography.fontSize.xs,
+  promptHelper: {
+    fontSize: HomeTypography.fontSize.sm,
     fontWeight: HomeTypography.fontWeight.light,
     color: HomeColors.muted,
     letterSpacing: HomeTypography.letterSpacing,
     opacity: 0.5,
+    marginTop: 4,
+  },
+  writingArea: {
+    flex: 1,
+    minHeight: 400,
+    position: 'relative',
+  },
+  placeholderContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 0,
+  },
+  placeholderText: {
+    fontSize: 19,
+    fontWeight: HomeTypography.fontWeight.light,
+    color: HomeColors.muted,
+    letterSpacing: 0.3,
+    lineHeight: 30,
+    opacity: 0.3,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 19, // Premium writing size
+    fontWeight: HomeTypography.fontWeight.regular,
+    color: 'hsl(40, 20%, 88%)', // Softer than pure white, like ink on paper
+    letterSpacing: 0.3,
+    lineHeight: 30, // Comfortable line height for writing
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
+    zIndex: 1,
   },
 });

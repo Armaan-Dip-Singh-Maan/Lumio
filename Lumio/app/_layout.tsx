@@ -37,6 +37,13 @@ export default function RootLayout() {
             }} 
           />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen 
+            name="journal-write" 
+            options={{ 
+              headerShown: false,
+              title: '', // Hide header for premium writing experience
+            }} 
+          />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
