@@ -26,9 +26,10 @@ interface EntryScreenProps {
   onEmailSubmit: (email: string) => void;
   onOAuthPress: (provider: 'apple' | 'google') => void;
   loading?: boolean;
+  loadingProvider?: 'apple' | 'google' | null;
 }
 
-export function EntryScreen({ onEmailSubmit, onOAuthPress, loading = false }: EntryScreenProps) {
+export function EntryScreen({ onEmailSubmit, onOAuthPress, loading = false, loadingProvider = null }: EntryScreenProps) {
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const insets = useSafeAreaInsets();
@@ -94,12 +95,12 @@ export function EntryScreen({ onEmailSubmit, onOAuthPress, loading = false }: En
           <OAuthButton
             provider="apple"
             onPress={() => onOAuthPress('apple')}
-            loading={loading}
+            loading={loading || loadingProvider === 'apple'}
           />
           <OAuthButton
             provider="google"
             onPress={() => onOAuthPress('google')}
-            loading={loading}
+            loading={loading || loadingProvider === 'google'}
           />
         </View>
 
