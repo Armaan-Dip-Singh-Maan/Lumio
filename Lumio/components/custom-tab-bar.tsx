@@ -1,7 +1,16 @@
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { useEffect } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  Dimensions,
+  type DimensionValue,
+  type ViewStyle,
+  type TextStyle,
+} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -11,7 +20,12 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from './ui/icon-symbol';
 
-// Separate component for animated tab to use hooks properly
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+/** Soft, soothing light tones on dark glass */
+const TAB_ACTIVE = 'rgba(250, 248, 245, 0.95)';
+const TAB_INACTIVE = 'rgba(255, 255, 255, 0.42)';
+
 function AnimatedTab({
   isFocused,
   iconName,
@@ -28,14 +42,14 @@ function AnimatedTab({
   onPress: () => void;
 }) {
   const scale = useSharedValue(isFocused ? 1.05 : 1);
-  const opacity = useSharedValue(isFocused ? 1 : 0.65);
+  const opacity = useSharedValue(isFocused ? 1 : 0.72);
 
   useEffect(() => {
     scale.value = withSpring(isFocused ? 1.05 : 1, {
       damping: 18,
       stiffness: 180,
     });
-    opacity.value = withTiming(isFocused ? 1 : 0.65, {
+    opacity.value = withTiming(isFocused ? 1 : 0.72, {
       duration: 250,
     });
   }, [isFocused]);
@@ -56,12 +70,24 @@ function AnimatedTab({
     <Pressable
       onPress={onPress}
       style={styles.tabButton}
-      android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
+      android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
     >
       <Animated.View style={[styles.iconContainer, animatedIconStyle]}>
         <IconSymbol
           name={iconName}
-          size={isFocused ? 26 : 24}
+          size={
+            isFocused
+              ? SCREEN_WIDTH < 375
+                ? 22
+                : SCREEN_WIDTH < 414
+                  ? 24
+                  : 26
+              : SCREEN_WIDTH < 375
+                ? 20
+                : SCREEN_WIDTH < 414
+                  ? 22
+                  : 24
+          }
           color={isFocused ? activeColor : inactiveColor}
         />
       </Animated.View>
@@ -96,18 +122,10 @@ const TAB_LABELS: Record<string, string> = {
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const activeColor = '#2D3748'; // Darker for better contrast
-  const inactiveColor = '#808b99'; // Slightly lighter for inactive
+  const activeColor = TAB_ACTIVE;
+  const inactiveColor = TAB_INACTIVE;
 
-  // Check if current active route is 'chat'
-  const activeRoute = state.routes[state.index];
-  const isChatScreen = activeRoute?.name === 'chat';
-
-  // Split routes into left and right groups for center button
-  const leftRoutes = state.routes.slice(0, 2); // Home, Journal
-  const rightRoutes = state.routes.slice(2); // Chat, You
-
-  const renderTab = (route: typeof state.routes[0], index: number, globalIndex: number) => {
+  const renderTab = (route: (typeof state.routes)[0], globalIndex: number) => {
     const { options } = descriptors[route.key];
     const label = TAB_LABELS[route.name] || options.title || route.name;
     const isFocused = state.index === globalIndex;
@@ -128,8 +146,11 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
       ? TAB_ICONS[route.name]?.active
       : TAB_ICONS[route.name]?.inactive) || 'house.fill';
 
-    // Type assertion for IconSymbol name prop
-    const iconNameTyped = iconName as 'house.fill' | 'book.fill' | 'bubble.left.and.bubble.right.fill' | 'person.fill';
+    const iconNameTyped = iconName as
+      | 'house.fill'
+      | 'book.fill'
+      | 'bubble.left.and.bubble.right.fill'
+      | 'person.fill';
 
     return (
       <AnimatedTab
@@ -146,44 +167,37 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
 
   return (
     <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      {/* Glassmorphism Tab Bar */}
-      <BlurView intensity={100} tint="light" style={styles.blurContainer}>
+      <BlurView
+        intensity={Platform.OS === 'ios' ? 80 : 70}
+        tint="dark"
+        style={styles.blurContainer}
+      >
         <View style={styles.tabBar}>
-          {/* Left side tabs */}
-          <View style={styles.leftTabs}>
-            {leftRoutes.map((route, index) => renderTab(route, index, index))}
-          </View>
-
-          {/* Center spacer for button - only when center button is visible */}
-          {!isChatScreen && <View style={styles.centerSpacer} />}
-
-          {/* Right side tabs */}
-          <View style={styles.rightTabs}>
-            {rightRoutes.map((route, index) => renderTab(route, index, index + 2))}
-          </View>
+          {state.routes.map((route, index) => renderTab(route, index))}
         </View>
       </BlurView>
-
-      {/* Center Floating Action Button - Hidden on Chat screen */}
-      {!isChatScreen && (
-        <View style={[styles.centerButtonContainer, { bottom: Math.max(insets.bottom, 8) + 38 }]}>
-          <Pressable
-            style={styles.centerButton}
-            onPress={() => {
-              // Handle center button press - you can navigate to a create screen
-              console.log('Center button pressed');
-            }}
-            android_ripple={{ color: 'rgba(255,255,255,0.3)' }}
-          >
-            <View style={styles.centerButtonInner}>
-              <IconSymbol name="plus" size={24} color="rgba(255, 255, 255, 0.95)" />
-            </View>
-          </Pressable>
-        </View>
-      )}
     </View>
   );
 }
+
+const getResponsiveStyles = () => {
+  const isSmall = SCREEN_WIDTH < 375;
+  const isMedium = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
+
+  return {
+    containerPadding: isSmall ? 12 : isMedium ? 14 : 16,
+    blurWidth: (isSmall ? '96%' : isMedium ? '94%' : '92%') as DimensionValue,
+    blurMaxWidth: isSmall ? SCREEN_WIDTH - 24 : isMedium ? 380 : 400,
+    blurBorderRadius: isSmall ? 24 : isMedium ? 27 : 30,
+    tabBarHeight: isSmall ? 60 : isMedium ? 64 : 68,
+    tabBarPadding: isSmall ? 4 : isMedium ? 8 : 10,
+    tabButtonPadding: isSmall ? 4 : 6,
+    iconContainerHeight: isSmall ? 24 : isMedium ? 26 : 28,
+    tabLabelFontSize: isSmall ? 9 : isMedium ? 10 : 10.5,
+  };
+};
+
+const responsive = getResponsiveStyles();
 
 const styles = StyleSheet.create({
   container: {
@@ -192,25 +206,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: responsive.containerPadding,
     paddingBottom: 8,
   },
   blurContainer: {
-    width: '92%',
-    maxWidth: 400,
-    borderRadius: 30,
+    width: responsive.blurWidth,
+    maxWidth: responsive.blurMaxWidth,
+    borderRadius: responsive.blurBorderRadius,
     overflow: 'hidden',
-    backgroundColor: Platform.select({
-      ios: 'rgba(255, 255, 255, 0.7)',
-      android: 'rgba(255, 255, 255, 0.9)',
-      default: 'rgba(255, 255, 255, 0.8)',
-    }),
+    backgroundColor:
+      Platform.OS === 'ios' ? 'rgba(28, 28, 30, 0.42)' : 'rgba(22, 22, 24, 0.88)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.35,
+        shadowRadius: 24,
       },
       android: {
         elevation: 12,
@@ -219,77 +232,35 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    height: 68,
+    height: responsive.tabBarHeight,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-  },
-  leftTabs: {
-    flexDirection: 'row',
-    flex: 1,
-    justifyContent: 'flex-start',
-    gap: 20,
-  },
-  rightTabs: {
-    flexDirection: 'row',
-    flex: 1,
-    justifyContent: 'flex-end',
-    gap: 20,
+    paddingHorizontal: responsive.tabBarPadding,
   },
   tabButton: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    minWidth: 56,
-    gap: 5,
+    paddingVertical: responsive.tabButtonPadding,
+    minWidth: 0,
+    gap: 4,
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 28,
+    height: responsive.iconContainerHeight,
   },
   tabLabel: {
-    fontSize: 10.5,
+    fontSize: responsive.tabLabelFontSize,
     fontWeight: '500',
     letterSpacing: 0.2,
-    color: '#2D3748',
+    color: TAB_INACTIVE,
   },
-  centerSpacer: {
-    width: 68, // Space for center button
-  },
-  centerButtonContainer: {
-    position: 'absolute',
-    alignSelf: 'center',
-    zIndex: 10,
-  },
-  centerButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'hsla(163, 20%, 50%, 0.9)', // Slightly less saturated, more muted
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#86AFA0',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
-  },
-  centerButtonInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-});
-
+}) as {
+  container: ViewStyle;
+  blurContainer: ViewStyle;
+  tabBar: ViewStyle;
+  tabButton: ViewStyle;
+  iconContainer: ViewStyle;
+  tabLabel: TextStyle;
+};

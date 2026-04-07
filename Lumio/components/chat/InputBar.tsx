@@ -22,65 +22,70 @@ export function InputBar({ onSend, disabled = false }: InputBarProps) {
   };
 
   return (
-    <BlurView intensity={20} tint="dark" style={styles.container}>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={[styles.input, { height: Math.min(height, 100) }]}
-          value={text}
-          onChangeText={setText}
-          placeholder="What's on your mind?"
-          placeholderTextColor={HomeColors.muted}
-          multiline
-          maxLength={500}
-          onContentSizeChange={(e) => {
-            setHeight(Math.max(44, e.nativeEvent.contentSize.height + 16));
-          }}
-          textAlignVertical="top"
-          editable={!disabled}
-        />
-        <TouchableOpacity
-          onPress={handleSend}
-          disabled={!text.trim() || disabled}
-          style={[
-            styles.sendButton,
-            (!text.trim() || disabled) && styles.sendButtonDisabled,
-          ]}
-          activeOpacity={0.7}
-        >
-          <IconSymbol
-            name={'paperplane.fill' as 'paperplane.fill'}
-            size={20}
-            color={(!text.trim() || disabled) ? HomeColors.muted : HomeColors.primary}
+    <BlurView intensity={Platform.OS === 'ios' ? 55 : 40} tint="dark" style={styles.blurWrap}>
+      <View style={styles.container}>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[styles.input, { height: Math.min(height, 100) }]}
+            value={text}
+            onChangeText={setText}
+            placeholder="What's on your mind?"
+            placeholderTextColor={HomeColors.muted}
+            multiline
+            maxLength={500}
+            onContentSizeChange={(e) => {
+              setHeight(Math.max(44, e.nativeEvent.contentSize.height + 16));
+            }}
+            textAlignVertical="top"
+            editable={!disabled}
           />
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSend}
+            disabled={!text.trim() || disabled}
+            style={[
+              styles.sendButton,
+              (!text.trim() || disabled) && styles.sendButtonDisabled,
+            ]}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              name={'paperplane.fill' as 'paperplane.fill'}
+              size={20}
+              color={!text.trim() || disabled ? HomeColors.muted : HomeColors.primary}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </BlurView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: HomeColors.glassBackground,
+  blurWrap: {
     borderRadius: 26,
-    borderWidth: 1,
-    borderColor: HomeColors.glassBorder,
     overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(28, 28, 30, 0.35)' : 'rgba(20, 20, 22, 0.92)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
       },
       android: {
-        elevation: 8,
+        elevation: 10,
       },
     }),
+  },
+  container: {
+    borderRadius: 26,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: HomeSpacing.sm,
     gap: HomeSpacing.sm,
   },
@@ -90,15 +95,15 @@ const styles = StyleSheet.create({
     fontWeight: HomeTypography.fontWeight.regular,
     color: HomeColors.foreground,
     letterSpacing: HomeTypography.letterSpacing,
-    backgroundColor: 'hsla(30, 6%, 12%, 0.5)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: 20,
     paddingHorizontal: HomeSpacing.md,
     paddingVertical: HomeSpacing.sm,
     minHeight: 44,
     maxHeight: 100,
     lineHeight: HomeTypography.fontSize.base * HomeTypography.lineHeight.normal,
-    borderWidth: 1,
-    borderColor: HomeColors.glassBorder,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   sendButton: {
     width: 44,
@@ -112,4 +117,3 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 });
-

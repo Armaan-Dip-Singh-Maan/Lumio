@@ -1,11 +1,13 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { RectButton, Swipeable } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
 
 export type TaskPriority = 'high' | 'medium' | 'low';
@@ -16,6 +18,7 @@ interface TaskItemProps {
   priority: TaskPriority;
   completed?: boolean;
   onToggleComplete: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 const priorityColors = {
@@ -24,7 +27,15 @@ const priorityColors = {
   low: HomeColors.priorityLow,
 };
 
-export function TaskItem({ id, title, priority, completed = false, onToggleComplete }: TaskItemProps) {
+export function TaskItem({
+  id,
+  title,
+  priority,
+  completed = false,
+  onToggleComplete,
+  onDelete,
+}: TaskItemProps) {
+  const swipeableRef = useRef<Swipeable>(null);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(completed ? 0.55 : 1);
 
@@ -40,6 +51,7 @@ export function TaskItem({ id, title, priority, completed = false, onToggleCompl
   }, [completed]);
 
   const handlePress = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     scale.value = withSpring(0.96, { damping: 15, stiffness: 300 }, () => {
       scale.value = withSpring(completed ? 0.98 : 1, { damping: 15, stiffness: 300 });
     });
@@ -51,35 +63,59 @@ export function TaskItem({ id, title, priority, completed = false, onToggleCompl
     opacity: opacity.value,
   }));
 
+  const handleDelete = () => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    onDelete(id);
+    swipeableRef.current?.close();
+  };
+
+  const renderLeftActions = () => (
+    <RectButton style={styles.deleteAction} onPress={handleDelete}>
+      <Text style={styles.deleteLabel}>Delete</Text>
+    </RectButton>
+  );
+
   return (
-    <Animated.View style={[styles.container, animatedStyle]}>
-      <View style={[styles.priorityIndicator, { backgroundColor: priorityColors[priority] }]} />
-      <TouchableOpacity
-        onPress={handlePress}
-        style={styles.content}
-        activeOpacity={0.7}
+    <View style={styles.swipeRow}>
+      <Swipeable
+        ref={swipeableRef}
+        renderLeftActions={renderLeftActions}
+        overshootLeft={false}
+        friction={2}
       >
-        <Text
-          style={[
-            styles.title,
-            completed && styles.titleCompleted,
-          ]}
-        >
-          {title}
-        </Text>
-        <View style={[styles.checkbox, completed && styles.checkboxCompleted]}>
-          {completed && <View style={styles.checkmark} />}
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+        <Animated.View style={[styles.container, animatedStyle]}>
+          <View style={[styles.priorityIndicator, { backgroundColor: priorityColors[priority] }]} />
+          <RectButton onPress={handlePress} style={styles.content} activeOpacity={0.7}>
+            <Text style={[styles.title, completed && styles.titleCompleted]}>{title}</Text>
+            <View style={[styles.checkbox, completed && styles.checkboxCompleted]}>
+              {completed && <View style={styles.checkmark} />}
+            </View>
+          </RectButton>
+        </Animated.View>
+      </Swipeable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  swipeRow: {
+    marginBottom: HomeSpacing.md,
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: HomeSpacing.md,
+  },
+  deleteAction: {
+    width: 88,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: HomeColors.priorityHigh,
+  },
+  deleteLabel: {
+    fontSize: HomeTypography.fontSize.sm,
+    fontWeight: HomeTypography.fontWeight.medium,
+    color: HomeColors.foreground,
+    letterSpacing: HomeTypography.letterSpacing,
   },
   priorityIndicator: {
     width: 3,
@@ -132,4 +168,3 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
 });
-

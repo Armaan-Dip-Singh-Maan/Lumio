@@ -27,10 +27,9 @@ const styles = StyleSheet.create({
     fontSize: HomeTypography.fontSize.sm,
     fontWeight: HomeTypography.fontWeight.light,
     color: HomeColors.muted,
-    letterSpacing: HomeTypography.letterSpacing,
+    letterSpacing: 1,
     opacity: 0.7,
     textTransform: 'uppercase',
-    letterSpacing: 1,
   },
 });
 

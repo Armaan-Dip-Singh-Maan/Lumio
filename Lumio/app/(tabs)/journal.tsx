@@ -1,21 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
   ScrollView,
+  TextInput,
+  RefreshControl,
+  Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
 import { TAB_BAR_HEIGHT } from '@/constants/navigation';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { JournalStorage, JournalEntry } from '@/utils/journal-storage';
+import { getJournalStats } from '@/utils/journal-stats';
 import {
   groupEntriesByLocalDate,
   getMarkedDates,
-  GroupedEntry,
 } from '@/utils/journal-helpers';
 import { CalendarMonth } from '@/components/journal/CalendarMonth';
 import { JournalEntryCard } from '@/components/journal/JournalEntryCard';
@@ -28,31 +31,51 @@ export default function JournalScreen() {
   const sectionRefs = useRef<Map<string, View>>(new Map());
   
   const [entries, setEntries] = useState<JournalEntry[]>([]);
-  const [groupedEntries, setGroupedEntries] = useState<GroupedEntry[]>([]);
-  const [markedDates, setMarkedDates] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [noEntryDate, setNoEntryDate] = useState<string | null>(null);
 
-  // Load entries on mount
-  React.useEffect(() => {
-    const loadEntries = async () => {
-      try {
-        const allEntries = await JournalStorage.getAllEntries();
-        setEntries(allEntries);
-        
-        const grouped = groupEntriesByLocalDate(allEntries);
-        setGroupedEntries(grouped);
-        
-        const marked = getMarkedDates(allEntries);
-        setMarkedDates(marked);
-      } catch (error) {
-        console.error('Error loading entries:', error);
-      }
-    };
-    
-    loadEntries();
+  const loadEntries = useCallback(async () => {
+    try {
+      const allEntries = await JournalStorage.getAllEntries();
+      setEntries(allEntries);
+    } catch (error) {
+      console.error('Error loading entries:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    loadEntries();
+  }, [loadEntries]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadEntries();
+    }, [loadEntries])
+  );
+
+  const filteredEntries = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return entries;
+    return entries.filter((e) => e.content.toLowerCase().includes(q));
+  }, [entries, searchQuery]);
+
+  const groupedEntries = useMemo(
+    () => groupEntriesByLocalDate(filteredEntries),
+    [filteredEntries]
+  );
+
+  const markedDates = useMemo(() => getMarkedDates(entries), [entries]);
+
+  const journalStats = useMemo(() => getJournalStats(entries), [entries]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadEntries();
+    setRefreshing(false);
+  }, [loadEntries]);
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
@@ -104,6 +127,13 @@ export default function JournalScreen() {
     </View>
   );
 
+  const renderSearchEmpty = () => (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyTitle}>No matches</Text>
+      <Text style={styles.emptySubtitle}>Try another word or clear the search.</Text>
+    </View>
+  );
+
   const renderNoEntryHint = () => {
     if (!noEntryDate) return null;
     
@@ -128,6 +158,11 @@ export default function JournalScreen() {
         <View style={styles.headerLeft}>
           <Text style={styles.title}>Journal</Text>
           <Text style={styles.subtitle}>Your thoughts over time</Text>
+          {entries.length > 0 ? (
+            <Text style={styles.streakLine}>
+              {journalStats.streakDays}-day streak · {journalStats.daysThisMonth} days this month
+            </Text>
+          ) : null}
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity
@@ -163,9 +198,28 @@ export default function JournalScreen() {
       {/* No Entry Hint */}
       {renderNoEntryHint()}
 
+      {entries.length > 0 ? (
+        <View style={styles.searchRow}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search entries…"
+            placeholderTextColor={HomeColors.muted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode={Platform.OS === 'ios' ? 'while-editing' : undefined}
+          />
+        </View>
+      ) : null}
+
       {/* Entries List */}
       {groupedEntries.length === 0 ? (
-        renderEmptyState()
+        entries.length === 0 ? (
+          renderEmptyState()
+        ) : (
+          renderSearchEmpty()
+        )
       ) : (
         <ScrollView
           ref={scrollViewRef}
@@ -174,8 +228,14 @@ export default function JournalScreen() {
             styles.scrollContent,
             { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + HomeSpacing.xl },
           ]}
-          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={HomeColors.muted}
+            />
+          }
         >
           {groupedEntries.map((group) => (
             <View
@@ -225,6 +285,29 @@ const styles = StyleSheet.create({
     color: HomeColors.muted,
     letterSpacing: HomeTypography.letterSpacing,
     opacity: 0.7,
+  },
+  streakLine: {
+    fontSize: HomeTypography.fontSize.xs,
+    fontWeight: HomeTypography.fontWeight.light,
+    color: HomeColors.muted,
+    letterSpacing: HomeTypography.letterSpacing,
+    opacity: 0.85,
+    marginTop: 4,
+  },
+  searchRow: {
+    paddingHorizontal: HomeSpacing.md,
+    marginBottom: HomeSpacing.sm,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: HomeColors.border,
+    borderRadius: 12,
+    paddingHorizontal: HomeSpacing.sm,
+    paddingVertical: 10,
+    fontSize: HomeTypography.fontSize.sm,
+    fontWeight: HomeTypography.fontWeight.light,
+    color: HomeColors.foreground,
+    backgroundColor: HomeColors.glassBackground,
   },
   headerRight: {
     flexDirection: 'row',

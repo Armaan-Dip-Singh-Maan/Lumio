@@ -1,0 +1,5 @@
+# Supabase local / project config
+# Deploy: supabase functions deploy clerk-welcome-email
+
+[functions.clerk-welcome-email]
+verify_jwt = false

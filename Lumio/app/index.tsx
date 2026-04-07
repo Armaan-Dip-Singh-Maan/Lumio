@@ -1,46 +1,58 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
-import { useAuth } from '@clerk/clerk-expo';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useAuth, useClerk } from '@clerk/clerk-expo';
 import { SplashScreen } from '@/components/auth/SplashScreen';
+import { BiometricUnlockScreen } from '@/components/auth/BiometricUnlockScreen';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export default function InitialScreen() {
   const router = useRouter();
   const { isSignedIn, isLoaded } = useAuth();
+  const { signOut } = useClerk();
+  const { isReady, biometricsEnabled } = useAppTheme();
+
+  const [pendingSplash, setPendingSplash] = useState(true);
+  const [needBio, setNeedBio] = useState(false);
 
   const handleSplashComplete = () => {
-    // Wait for Clerk to finish loading
-    if (!isLoaded) {
-      // If not loaded yet, wait a bit and check again
-      setTimeout(handleSplashComplete, 100);
-      return;
-    }
-
-    if (isSignedIn) {
-      // User is already signed in - go directly to home
-      router.replace('/(tabs)');
-    } else {
-      // User is not signed in - go to auth flow
-      router.replace('/(auth)');
-    }
+    setPendingSplash(false);
   };
 
-  // Check auth state when Clerk loads and redirect accordingly
-  // This prevents redirect loops by ensuring we only redirect once when loaded
   useEffect(() => {
-    if (isLoaded) {
-      // Small delay to ensure navigation is ready
-      const timer = setTimeout(() => {
-        if (isSignedIn) {
-          router.replace('/(tabs)');
-        } else {
-          router.replace('/(auth)');
-        }
-      }, 100);
-
-      return () => clearTimeout(timer);
+    if (pendingSplash) return;
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      router.replace('/(auth)');
+      return;
     }
-  }, [isLoaded, isSignedIn, router]);
+    if (!isReady) return;
+    if (biometricsEnabled) {
+      setNeedBio(true);
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [pendingSplash, isLoaded, isSignedIn, isReady, biometricsEnabled, router]);
+
+  const handleBiometricUnlocked = useCallback(() => {
+    setNeedBio(false);
+    router.replace('/(tabs)');
+  }, [router]);
+
+  const handleBiometricSignOut = useCallback(async () => {
+    try {
+      await signOut();
+      setNeedBio(false);
+      router.replace('/(auth)');
+    } catch (e) {
+      console.error(e);
+    }
+  }, [router, signOut]);
+
+  if (needBio && isSignedIn && isReady) {
+    return (
+      <BiometricUnlockScreen onUnlocked={handleBiometricUnlocked} onSignOut={handleBiometricSignOut} />
+    );
+  }
 
   return <SplashScreen onComplete={handleSplashComplete} />;
 }
-

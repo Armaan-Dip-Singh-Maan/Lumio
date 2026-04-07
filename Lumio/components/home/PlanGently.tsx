@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -22,11 +22,12 @@ export interface Task {
 interface PlanGentlyProps {
   tasks: Task[];
   onToggleTask: (id: string) => void;
+  onDeleteTask: (id: string) => void;
   onAddTask: () => void;
   onViewAll?: () => void;
 }
 
-export function PlanGently({ tasks, onToggleTask, onAddTask, onViewAll }: PlanGentlyProps) {
+export function PlanGently({ tasks, onToggleTask, onDeleteTask, onAddTask, onViewAll }: PlanGentlyProps) {
   const scale = useSharedValue(1);
   const translateY = useSharedValue(6);
   const opacity = useSharedValue(0);
@@ -69,7 +70,7 @@ export function PlanGently({ tasks, onToggleTask, onAddTask, onViewAll }: PlanGe
             <IconSymbol
               name={'plus' as 'plus'}
               size={18}
-              color={HomeColors.muted}
+              color={HomeColors.foreground}
             />
           </TouchableOpacity>
         </View>
@@ -91,7 +92,7 @@ export function PlanGently({ tasks, onToggleTask, onAddTask, onViewAll }: PlanGe
                 <IconSymbol
                   name={'plus' as 'plus'}
                   size={20}
-                  color={HomeColors.muted}
+                  color={HomeColors.foreground}
                 />
                 <Text style={styles.addButtonText}>Add a task</Text>
               </TouchableOpacity>
@@ -106,6 +107,7 @@ export function PlanGently({ tasks, onToggleTask, onAddTask, onViewAll }: PlanGe
                   priority={task.priority}
                   completed={task.completed}
                   onToggleComplete={onToggleTask}
+                  onDelete={onDeleteTask}
                 />
               ))}
 
@@ -213,7 +215,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: HomeTypography.fontSize.base,
     fontWeight: HomeTypography.fontWeight.regular,
-    color: HomeColors.muted,
+    color: HomeColors.foreground,
     letterSpacing: HomeTypography.letterSpacing,
   },
   tasksContainer: {

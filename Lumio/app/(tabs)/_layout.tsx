@@ -1,4 +1,4 @@
-import { Tabs, useRouter, useSegments } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 
@@ -7,8 +7,6 @@ import { CustomTabBar } from '@/components/custom-tab-bar';
 export default function TabLayout() {
   const { isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
-  const segments = useSegments();
-
   // Navigation guard: protect tabs routes
   useEffect(() => {
     if (!isLoaded) {
@@ -27,8 +25,7 @@ export default function TabLayout() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        animation: 'fade', // Smooth fade transition
-        animationDuration: 200, // Quick but smooth
+        animation: 'fade',
       }}>
       <Tabs.Screen
         name="index"

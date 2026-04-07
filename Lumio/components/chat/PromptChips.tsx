@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Platform } from 'react-native';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
 
 interface PromptChipsProps {
@@ -10,6 +10,9 @@ const PROMPTS = [
   'I feel overwhelmed',
   'I need clarity',
   'Help me reflect',
+  'Something good happened today',
+  'I want to let something go',
+  'Name one small win',
 ];
 
 export function PromptChips({ onSelect }: PromptChipsProps) {
@@ -20,7 +23,7 @@ export function PromptChips({ onSelect }: PromptChipsProps) {
           key={index}
           onPress={() => onSelect(prompt)}
           style={styles.chip}
-          activeOpacity={0.7}
+          activeOpacity={0.75}
         >
           <Text style={styles.chipText}>{prompt}</Text>
         </TouchableOpacity>
@@ -34,9 +37,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: HomeSpacing.sm,
-    paddingHorizontal: HomeSpacing.md,
-    marginTop: HomeSpacing.lg,
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 20
   },
   chip: {
     paddingHorizontal: HomeSpacing.md,
@@ -45,13 +48,23 @@ const styles = StyleSheet.create({
     backgroundColor: HomeColors.glassBackground,
     borderWidth: 1,
     borderColor: HomeColors.glassBorder,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   chipText: {
     fontSize: HomeTypography.fontSize.sm,
     fontWeight: HomeTypography.fontWeight.light,
     color: HomeColors.foreground,
     letterSpacing: HomeTypography.letterSpacing,
-    opacity: 0.9,
+    opacity: 0.92,
   },
 });
-
