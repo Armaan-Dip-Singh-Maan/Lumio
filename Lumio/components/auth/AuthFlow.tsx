@@ -10,6 +10,7 @@ import { WelcomeScreen } from './WelcomeScreen';
 import { SplashScreen } from './SplashScreen';
 import { AuthColors, AuthTypography } from '@/constants/auth-theme';
 import { checkEmailExists } from '@/utils/clerk-auth';
+import { clerkErrorToMessage } from '@/utils/clerk-auth-errors';
 
 type AuthStep = 'entry' | 'password' | 'verify' | 'welcome' | 'complete';
 type UserType = 'new' | 'existing' | null;
@@ -60,7 +61,9 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
       setUserType(exists ? 'existing' : 'new');
       setStep('password');
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      setError(
+        clerkErrorToMessage(err, 'Something went wrong. Please try again.')
+      );
     } finally {
       setLoading(false);
     }
@@ -78,7 +81,7 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
         redirectUrl,
       });
 
-      if (createdSessionId) {
+      if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
         // Check if this is a new user by checking if they just signed up
         // For OAuth, we'll treat it as existing user for simplicity
@@ -87,9 +90,10 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
       } else {
         setError('Authentication incomplete. Please try again.');
       }
-    } catch (err: any) {
-      const errorMessage = err?.message || 'Authentication failed. Please try again.';
-      setError(errorMessage);
+    } catch (err: unknown) {
+      setError(
+        clerkErrorToMessage(err, 'Authentication failed. Please try again.')
+      );
     } finally {
       setLoadingProvider(null);
     }
@@ -150,15 +154,15 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
           setError('Sign in incomplete. Please try again.');
         }
       }
-    } catch (err: any) {
-      // Handle Clerk errors gracefully
-      const errorMessage =
-        err?.errors?.[0]?.message ||
-        err?.message ||
-        (userType === 'new'
-          ? 'Something went wrong. Please try again.'
-          : "That password doesn't seem right.");
-      setError(errorMessage);
+    } catch (err: unknown) {
+      setError(
+        clerkErrorToMessage(
+          err,
+          userType === 'new'
+            ? 'Something went wrong. Please try again.'
+            : "That password doesn't seem right."
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -183,12 +187,10 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
       } else {
         setError('Verification incomplete. Please try again.');
       }
-    } catch (err: any) {
-      const errorMessage =
-        err?.errors?.[0]?.message ||
-        err?.message ||
-        "That code doesn't seem right.";
-      setError(errorMessage);
+    } catch (err: unknown) {
+      setError(
+        clerkErrorToMessage(err, "That code doesn't seem right.")
+      );
     } finally {
       setLoading(false);
     }
@@ -213,20 +215,30 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
         identifier: email,
       });
       // Then prepare password reset
+      const resetFactor = signIn.supportedFirstFactors?.find(
+        (f) => f.strategy === 'reset_password_email_code'
+      ) as { emailAddressId?: string } | undefined;
+      if (!resetFactor?.emailAddressId) {
+        setError('Could not start password reset. Try again.');
+        return;
+      }
       await signIn.prepareFirstFactor({
         strategy: 'reset_password_email_code',
+        emailAddressId: resetFactor.emailAddressId,
       });
       setError('Password reset link sent to your email.');
       setTimeout(() => {
         setError(null);
       }, 3000);
-    } catch (err: any) {
-      setError('Could not send reset email. Please try again.');
+    } catch (err: unknown) {
+      setError(
+        clerkErrorToMessage(err, 'Could not send reset email. Please try again.')
+      );
     }
   };
 
   const handleSplashComplete = () => {
-    // After splash, show welcome screen for new users
+    setShowSplashForNewUser(false);
     if (userType === 'new') {
       setStep('welcome');
     } else {
@@ -243,7 +255,7 @@ export function AuthFlow({ onComplete }: AuthFlowProps) {
 
   return (
     <View style={styles.container}>
-      {step === 'splash' && showSplashForNewUser ? (
+      {showSplashForNewUser ? (
         <SplashScreen onComplete={handleSplashComplete} />
       ) : (
         <>

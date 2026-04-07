@@ -34,6 +34,13 @@ yarn-error.*
 .env
 .env*.local
 
+# Secrets (EAS / keystores metadata — never commit)
+credentials.json
+credentials/
+
+# Accidental nested duplicate app tree
+Lumio/
+
 # typescript
 *.tsbuildinfo
 

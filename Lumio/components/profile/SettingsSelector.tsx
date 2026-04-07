@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
+import { HomeTypography, HomeSpacing } from '@/constants/home-theme';
+import { useThemeColors } from '@/contexts/AppThemeContext';
 
 interface SettingsSelectorProps<T extends string> {
   label: string;
@@ -15,6 +16,54 @@ export function SettingsSelector<T extends string>({
   options,
   onValueChange,
 }: SettingsSelectorProps<T>) {
+  const colors = useThemeColors();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          paddingVertical: HomeSpacing.md,
+          paddingHorizontal: HomeSpacing.md,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        label: {
+          fontSize: HomeTypography.fontSize.base,
+          fontWeight: HomeTypography.fontWeight.regular,
+          color: colors.foreground,
+          letterSpacing: HomeTypography.letterSpacing,
+          marginBottom: HomeSpacing.sm,
+        },
+        optionsContainer: {
+          flexDirection: 'row',
+          gap: HomeSpacing.sm,
+          flexWrap: 'wrap',
+        },
+        option: {
+          paddingHorizontal: HomeSpacing.md,
+          paddingVertical: HomeSpacing.sm,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: 'transparent',
+        },
+        optionSelected: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        optionText: {
+          fontSize: HomeTypography.fontSize.sm,
+          fontWeight: HomeTypography.fontWeight.regular,
+          color: colors.muted,
+          letterSpacing: HomeTypography.letterSpacing,
+        },
+        optionTextSelected: {
+          color: colors.primaryForeground,
+          fontWeight: HomeTypography.fontWeight.medium,
+        },
+      }),
+    [colors]
+  );
+
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
@@ -38,46 +87,3 @@ export function SettingsSelector<T extends string>({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: HomeSpacing.md,
-    paddingHorizontal: HomeSpacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: HomeColors.border,
-  },
-  label: {
-    fontSize: HomeTypography.fontSize.base,
-    fontWeight: HomeTypography.fontWeight.regular,
-    color: HomeColors.foreground,
-    letterSpacing: HomeTypography.letterSpacing,
-    marginBottom: HomeSpacing.sm,
-  },
-  optionsContainer: {
-    flexDirection: 'row',
-    gap: HomeSpacing.sm,
-  },
-  option: {
-    paddingHorizontal: HomeSpacing.md,
-    paddingVertical: HomeSpacing.sm,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: HomeColors.border,
-    backgroundColor: 'transparent',
-  },
-  optionSelected: {
-    backgroundColor: HomeColors.primary,
-    borderColor: HomeColors.primary,
-  },
-  optionText: {
-    fontSize: HomeTypography.fontSize.sm,
-    fontWeight: HomeTypography.fontWeight.regular,
-    color: HomeColors.muted,
-    letterSpacing: HomeTypography.letterSpacing,
-  },
-  optionTextSelected: {
-    color: HomeColors.primaryForeground,
-    fontWeight: HomeTypography.fontWeight.medium,
-  },
-});
-

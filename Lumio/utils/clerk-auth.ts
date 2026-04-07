@@ -3,6 +3,11 @@ import * as SecureStore from 'expo-secure-store';
 
 /**
  * Token cache for Clerk using expo-secure-store
+ *
+ * Production checklist (Clerk Dashboard):
+ * - Allowed redirect URLs: lumio://, Expo dev URLs, EAS deep links used by OAuth (see AuthFlow redirectUrl).
+ * - Google OAuth: Android SHA-1 / iOS bundle com.lumiojournal.app aligned with production builds.
+ * - EAS: set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY via `eas env:create` or project secrets for preview/production.
  */
 export const tokenCache = {
   async getToken(key: string): Promise<string | null> {

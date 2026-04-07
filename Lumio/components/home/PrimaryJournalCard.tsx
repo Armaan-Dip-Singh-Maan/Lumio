@@ -12,14 +12,21 @@ import Animated, {
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
 
 interface PrimaryJournalCardProps {
   hasEntryToday?: boolean;
+  /** e.g. "3-day streak · 5 days this month" — omit when empty */
+  streakSummary?: string | null;
   onWritePress: () => void;
 }
 
-export function PrimaryJournalCard({ hasEntryToday = false, onWritePress }: PrimaryJournalCardProps) {
+export function PrimaryJournalCard({
+  hasEntryToday = false,
+  streakSummary,
+  onWritePress,
+}: PrimaryJournalCardProps) {
   const cardScale = useSharedValue(1);
   const cardTranslateY = useSharedValue(6);
   const cardOpacity = useSharedValue(0);
@@ -111,9 +118,16 @@ export function PrimaryJournalCard({ hasEntryToday = false, onWritePress }: Prim
           <Text style={styles.prompt}>{prompt}</Text>
           <Text style={styles.supportiveLine}>{supportiveLine}</Text>
 
+          {streakSummary ? (
+            <Text style={styles.streakSummary}>{streakSummary}</Text>
+          ) : null}
+
           <Animated.View style={buttonAnimatedStyle}>
             <TouchableOpacity
-              onPress={onWritePress}
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onWritePress();
+              }}
               onPressIn={handleButtonPressIn}
               onPressOut={handleButtonPressOut}
               style={styles.writeButton}
@@ -198,8 +212,17 @@ const styles = StyleSheet.create({
     color: HomeColors.muted,
     letterSpacing: HomeTypography.letterSpacing,
     textAlign: 'center',
-    marginBottom: HomeSpacing.xl,
+    marginBottom: HomeSpacing.sm,
     opacity: 0.75,
+  },
+  streakSummary: {
+    fontSize: HomeTypography.fontSize.sm,
+    fontWeight: HomeTypography.fontWeight.light,
+    color: HomeColors.muted,
+    letterSpacing: HomeTypography.letterSpacing,
+    textAlign: 'center',
+    marginBottom: HomeSpacing.lg,
+    opacity: 0.85,
   },
   writeButton: {
     backgroundColor: HomeColors.primary,

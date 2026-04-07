@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,69 +12,179 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useUser, useClerk } from '@clerk/clerk-expo';
-import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
+import { HomeColorsDark, HomeTypography, HomeSpacing } from '@/constants/home-theme';
+import type { HomePalette } from '@/constants/home-theme';
 import { TAB_BAR_HEIGHT } from '@/constants/navigation';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { SettingsSection } from '@/components/profile/SettingsSection';
 import { SettingsToggle } from '@/components/profile/SettingsToggle';
-import { SettingsSelector } from '@/components/profile/SettingsSelector';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { JournalStorage } from '@/utils/journal-storage';
+import { shareJournalMarkdown } from '@/utils/journal-export';
 
-type Theme = 'system' | 'dark' | 'light';
-type TextSize = 'small' | 'default' | 'large';
+function buildStyles(colors: HomePalette) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    header: {
+      paddingHorizontal: HomeSpacing.md,
+      marginBottom: HomeSpacing.sm,
+    },
+    headerTitle: {
+      fontSize: HomeTypography.fontSize['2xl'],
+      fontWeight: HomeTypography.fontWeight.light,
+      color: colors.foreground,
+      letterSpacing: HomeTypography.letterSpacing,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: HomeSpacing.md,
+      paddingTop: HomeSpacing.md,
+    },
+    topSection: {
+      alignItems: 'center',
+      marginBottom: HomeSpacing.xl,
+      paddingTop: HomeSpacing.md,
+    },
+    avatarContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.glassBackground,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: HomeSpacing.md,
+    },
+    emailText: {
+      fontSize: HomeTypography.fontSize.base,
+      fontWeight: HomeTypography.fontWeight.light,
+      color: colors.muted,
+      letterSpacing: HomeTypography.letterSpacing,
+      opacity: 0.8,
+    },
+    sectionCard: {
+      borderRadius: 16,
+      backgroundColor: colors.glassBackground,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      overflow: 'hidden',
+    },
+    actionButton: {
+      paddingVertical: HomeSpacing.md,
+      paddingHorizontal: HomeSpacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    actionButtonDestructive: {
+      borderBottomWidth: 0,
+    },
+    actionButtonText: {
+      fontSize: HomeTypography.fontSize.base,
+      fontWeight: HomeTypography.fontWeight.regular,
+      color: colors.foreground,
+      letterSpacing: HomeTypography.letterSpacing,
+    },
+    actionButtonTextDestructive: {
+      color: colors.muted,
+      opacity: 0.7,
+    },
+    privacyNote: {
+      paddingVertical: HomeSpacing.md,
+      paddingHorizontal: HomeSpacing.md,
+    },
+    privacyNoteText: {
+      fontSize: HomeTypography.fontSize.sm,
+      fontWeight: HomeTypography.fontWeight.light,
+      color: colors.muted,
+      letterSpacing: HomeTypography.letterSpacing,
+      opacity: 0.7,
+      lineHeight: HomeTypography.fontSize.sm * HomeTypography.lineHeight.relaxed,
+    },
+    accountInfo: {
+      paddingVertical: HomeSpacing.md,
+      paddingHorizontal: HomeSpacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    accountLabel: {
+      fontSize: HomeTypography.fontSize.sm,
+      fontWeight: HomeTypography.fontWeight.light,
+      color: colors.muted,
+      letterSpacing: HomeTypography.letterSpacing,
+      marginBottom: 4,
+      opacity: 0.8,
+    },
+    accountValue: {
+      fontSize: HomeTypography.fontSize.base,
+      fontWeight: HomeTypography.fontWeight.regular,
+      color: colors.foreground,
+      letterSpacing: HomeTypography.letterSpacing,
+    },
+    separator: {
+      height: HomeSpacing.md,
+    },
+  });
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, isLoaded: userLoaded } = useUser();
   const { signOut } = useClerk();
-  
-  const [theme, setTheme] = useState<Theme>('system');
-  const [textSize, setTextSize] = useState<TextSize>('default');
-  const [dailyReminder, setDailyReminder] = useState(false);
-  const [affirmations, setAffirmations] = useState(false);
-  const [useBiometrics, setUseBiometrics] = useState(false);
-  const [showPrompt, setShowPrompt] = useState(true);
-  const [blankPage, setBlankPage] = useState(false);
-  const [moodCheckIn, setMoodCheckIn] = useState(false);
 
-  // Get user email from Clerk
-  // Use primaryEmailAddress first, fallback to first email in emailAddresses array
-  const userEmail = user?.primaryEmailAddress?.emailAddress || 
-                    user?.emailAddresses?.[0]?.emailAddress || 
-                    null;
-  
-  // Determine login method from user's external accounts
-  const loginMethod = user?.externalAccounts?.length > 0
-    ? user.externalAccounts[0].provider === 'oauth_google' 
-      ? 'Google' 
-      : user.externalAccounts[0].provider === 'oauth_apple'
-      ? 'Apple'
-      : 'OAuth'
+  const {
+    colors,
+    biometricsEnabled,
+    setBiometricsEnabled,
+    showGentlePrompt,
+    setShowGentlePrompt,
+    startBlankPage,
+    setStartBlankPage,
+    moodCheckInOnOpen,
+    setMoodCheckInOnOpen,
+  } = useAppTheme();
+
+  const styles = useMemo(() => buildStyles(colors), [colors]);
+  const blurTint = 'dark' as const;
+
+  const userEmail =
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress ||
+    null;
+
+  const firstOAuth = user?.externalAccounts?.[0];
+  const providerStr =
+    firstOAuth?.provider != null ? String(firstOAuth.provider) : '';
+  const loginMethod = firstOAuth
+    ? providerStr.includes('google')
+      ? 'Google'
+      : providerStr.includes('apple')
+        ? 'Apple'
+        : 'OAuth'
     : 'Email';
 
   const handleSignOut = async () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Use Clerk's signOut method
-              await signOut();
-              // Redirect to auth screen after sign out
-              router.replace('/(auth)');
-            } catch (error) {
-              console.error('Error signing out:', error);
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
-            }
-          },
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+            router.replace('/(auth)');
+          } catch (error) {
+            console.error('Error signing out:', error);
+            Alert.alert('Error', 'Failed to sign out. Please try again.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleDeleteAccount = () => {
@@ -87,7 +197,6 @@ export default function ProfileScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            // In production, this would call an API to delete the account via Clerk
             try {
               await signOut();
               router.replace('/(auth)');
@@ -101,28 +210,34 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleExportJournal = () => {
-    // In production, this would export journal entries
-    Alert.alert('Export Journal', 'Journal export feature coming soon.');
-  };
-
   const handleAbout = () => {
     Alert.alert('About Lumio', 'Lumio is a calm space for reflection and growth.');
   };
 
   const handleShareFeedback = () => {
-    // In production, this would open feedback form or email
     Alert.alert('Share Feedback', 'Feedback feature coming soon.');
   };
 
   const handlePrivacyPolicy = () => {
-    // In production, this would open privacy policy
-    Alert.alert('Privacy Policy', 'Privacy policy coming soon.');
+    router.push('/privacy-policy');
   };
 
   const handleTerms = () => {
-    // In production, this would open terms of service
-    Alert.alert('Terms of Service', 'Terms of service coming soon.');
+    router.push('/terms-of-service');
+  };
+
+  const handleExportJournal = async () => {
+    try {
+      const entries = await JournalStorage.getAllEntries();
+      if (entries.length === 0) {
+        Alert.alert('Nothing to export', 'Write a journal entry first.');
+        return;
+      }
+      await shareJournalMarkdown(entries);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Export failed', 'Please try again.');
+    }
   };
 
   const renderActionButton = (
@@ -135,31 +250,34 @@ export default function ProfileScreen() {
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Text style={[styles.actionButtonText, destructive && styles.actionButtonTextDestructive]}>
+      <Text
+        style={[styles.actionButtonText, destructive && styles.actionButtonTextDestructive]}
+      >
         {label}
       </Text>
     </TouchableOpacity>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: HomeColors.background }]}>
-      {/* Header */}
+    <View style={[styles.container, { backgroundColor: HomeColorsDark.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 16, paddingBottom: 16 }]}>
         <Text style={styles.headerTitle}>Profile</Text>
       </View>
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + HomeSpacing.xl }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + HomeSpacing.xl },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Section - Avatar and Email */}
         <View style={styles.topSection}>
-          <BlurView intensity={20} tint="dark" style={styles.avatarContainer}>
+          <BlurView intensity={28} tint={blurTint} style={styles.avatarContainer}>
             <IconSymbol
               name={'person.fill' as 'person.fill'}
               size={32}
-              color={HomeColors.muted}
+              color={colors.muted}
             />
           </BlurView>
           {userLoaded ? (
@@ -173,57 +291,12 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Appearance Section */}
-        <SettingsSection title="Appearance">
-          <BlurView intensity={20} tint="dark" style={styles.sectionCard}>
-            <SettingsSelector
-              label="Theme"
-              value={theme}
-              options={[
-                { label: 'System', value: 'system' },
-                { label: 'Dark', value: 'dark' },
-                { label: 'Light', value: 'light' },
-              ]}
-              onValueChange={setTheme}
-            />
-            <SettingsSelector
-              label="Text Size"
-              value={textSize}
-              options={[
-                { label: 'Small', value: 'small' },
-                { label: 'Default', value: 'default' },
-                { label: 'Large', value: 'large' },
-              ]}
-              onValueChange={setTextSize}
-            />
-          </BlurView>
-        </SettingsSection>
-
-        {/* Notifications Section */}
-        <SettingsSection title="Notifications">
-          <BlurView intensity={20} tint="dark" style={styles.sectionCard}>
-            <SettingsToggle
-              label="Daily journal reminder"
-              value={dailyReminder}
-              onValueChange={setDailyReminder}
-              subtext="A gentle reminder to reflect."
-            />
-            <SettingsToggle
-              label="Occasional affirmations"
-              value={affirmations}
-              onValueChange={setAffirmations}
-              subtext="Words of encouragement when you need them."
-            />
-          </BlurView>
-        </SettingsSection>
-
-        {/* Privacy Section */}
         <SettingsSection title="Privacy">
-          <BlurView intensity={20} tint="dark" style={styles.sectionCard}>
+          <BlurView intensity={28} tint={blurTint} style={styles.sectionCard}>
             <SettingsToggle
               label={`Use ${Platform.OS === 'ios' ? 'Face ID / Touch ID' : 'Biometrics'}`}
-              value={useBiometrics}
-              onValueChange={setUseBiometrics}
+              value={biometricsEnabled}
+              onValueChange={(v) => void setBiometricsEnabled(v)}
               subtext="Extra privacy when opening Lumio."
             />
             {renderActionButton('Export my journal', handleExportJournal)}
@@ -235,36 +308,33 @@ export default function ProfileScreen() {
           </BlurView>
         </SettingsSection>
 
-        {/* Preferences Section */}
         <SettingsSection title="Preferences">
-          <BlurView intensity={20} tint="dark" style={styles.sectionCard}>
+          <BlurView intensity={28} tint={blurTint} style={styles.sectionCard}>
             <SettingsToggle
               label="Show a gentle prompt before writing"
-              value={showPrompt}
-              onValueChange={setShowPrompt}
+              value={showGentlePrompt}
+              onValueChange={(v) => void setShowGentlePrompt(v)}
             />
             <SettingsToggle
               label="Start with a blank page"
-              value={blankPage}
-              onValueChange={setBlankPage}
+              value={startBlankPage}
+              onValueChange={(v) => void setStartBlankPage(v)}
             />
             <SettingsToggle
-              label="Ask for mood check-in when opening the app"
-              value={moodCheckIn}
-              onValueChange={setMoodCheckIn}
+              label="Mood check-in on Home"
+              value={moodCheckInOnOpen}
+              onValueChange={(v) => void setMoodCheckInOnOpen(v)}
+              subtext="We only ask once, the first time you open Home."
             />
           </BlurView>
         </SettingsSection>
 
-        {/* Account Section */}
         <SettingsSection title="Account">
-          <BlurView intensity={20} tint="dark" style={styles.sectionCard}>
+          <BlurView intensity={28} tint={blurTint} style={styles.sectionCard}>
             <View style={styles.accountInfo}>
               <Text style={styles.accountLabel}>Email</Text>
               <Text style={styles.accountValue}>
-                {userLoaded 
-                  ? (userEmail || 'No email available')
-                  : 'Loading...'}
+                {userLoaded ? userEmail || 'No email available' : 'Loading...'}
               </Text>
             </View>
             <View style={styles.accountInfo}>
@@ -277,9 +347,8 @@ export default function ProfileScreen() {
           </BlurView>
         </SettingsSection>
 
-        {/* About Section */}
         <SettingsSection title="About">
-          <BlurView intensity={20} tint="dark" style={styles.sectionCard}>
+          <BlurView intensity={28} tint={blurTint} style={styles.sectionCard}>
             {renderActionButton('About Lumio', handleAbout)}
             <View style={styles.accountInfo}>
               <Text style={styles.accountLabel}>App Version</Text>
@@ -294,110 +363,3 @@ export default function ProfileScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: HomeSpacing.md,
-    marginBottom: HomeSpacing.sm,
-  },
-  headerTitle: {
-    fontSize: HomeTypography.fontSize['2xl'],
-    fontWeight: HomeTypography.fontWeight.light,
-    color: HomeColors.foreground,
-    letterSpacing: HomeTypography.letterSpacing,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: HomeSpacing.md,
-    paddingTop: HomeSpacing.md,
-  },
-  topSection: {
-    alignItems: 'center',
-    marginBottom: HomeSpacing.xl,
-    paddingTop: HomeSpacing.md,
-  },
-  avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: HomeColors.glassBackground,
-    borderWidth: 1,
-    borderColor: HomeColors.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: HomeSpacing.md,
-  },
-  emailText: {
-    fontSize: HomeTypography.fontSize.base,
-    fontWeight: HomeTypography.fontWeight.light,
-    color: HomeColors.muted,
-    letterSpacing: HomeTypography.letterSpacing,
-    opacity: 0.8,
-  },
-  sectionCard: {
-    borderRadius: 16,
-    backgroundColor: HomeColors.glassBackground,
-    borderWidth: 1,
-    borderColor: HomeColors.glassBorder,
-    overflow: 'hidden',
-  },
-  actionButton: {
-    paddingVertical: HomeSpacing.md,
-    paddingHorizontal: HomeSpacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: HomeColors.border,
-  },
-  actionButtonDestructive: {
-    borderBottomWidth: 0,
-  },
-  actionButtonText: {
-    fontSize: HomeTypography.fontSize.base,
-    fontWeight: HomeTypography.fontWeight.regular,
-    color: HomeColors.foreground,
-    letterSpacing: HomeTypography.letterSpacing,
-  },
-  actionButtonTextDestructive: {
-    color: HomeColors.muted,
-    opacity: 0.7,
-  },
-  privacyNote: {
-    paddingVertical: HomeSpacing.md,
-    paddingHorizontal: HomeSpacing.md,
-  },
-  privacyNoteText: {
-    fontSize: HomeTypography.fontSize.sm,
-    fontWeight: HomeTypography.fontWeight.light,
-    color: HomeColors.muted,
-    letterSpacing: HomeTypography.letterSpacing,
-    opacity: 0.7,
-    lineHeight: HomeTypography.fontSize.sm * HomeTypography.lineHeight.relaxed,
-  },
-  accountInfo: {
-    paddingVertical: HomeSpacing.md,
-    paddingHorizontal: HomeSpacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: HomeColors.border,
-  },
-  accountLabel: {
-    fontSize: HomeTypography.fontSize.sm,
-    fontWeight: HomeTypography.fontWeight.light,
-    color: HomeColors.muted,
-    letterSpacing: HomeTypography.letterSpacing,
-    marginBottom: 4,
-    opacity: 0.8,
-  },
-  accountValue: {
-    fontSize: HomeTypography.fontSize.base,
-    fontWeight: HomeTypography.fontWeight.regular,
-    color: HomeColors.foreground,
-    letterSpacing: HomeTypography.letterSpacing,
-  },
-  separator: {
-    height: HomeSpacing.md,
-  },
-});

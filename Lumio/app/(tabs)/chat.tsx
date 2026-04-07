@@ -1,235 +1,384 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
   Text,
-  ScrollView,
+  FlatList,
   Platform,
+  KeyboardAvoidingView,
   Keyboard,
+  Alert,
+  TouchableOpacity,
+  type ListRenderItem,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
-import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
+import { HomeColorsDark, HomeTypography, HomeSpacing } from '@/constants/home-theme';
 import { TAB_BAR_HEIGHT } from '@/constants/navigation';
 import { EmptyState } from '@/components/chat/EmptyState';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { MessageBubble, Message } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { InputBar } from '@/components/chat/InputBar';
-import { generateNoviResponse } from '@/utils/novi-responses';
+import { ChatCrisisBanner } from '@/components/chat/ChatCrisisBanner';
+import * as Haptics from 'expo-haptics';
+import {
+  loadChatMessages,
+  saveChatMessages,
+  clearChatMessages,
+  ChatMessage,
+} from '@/utils/services/chat-storage';
+import { getAIResponseWithRetry } from '@/utils/services/ai';
+import { containsCrisisKeywords } from '@/constants/ai-prompt';
+
+/** Reserve space above the floating tab bar when keyboard is hidden */
+function composerBottomPadding(insets: { bottom: number }) {
+  return TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) + 8;
+}
+
+/** Tight margin above keyboard — tab bar is covered; avoid stacking with KeyboardAvoidingView */
+const KEYBOARD_OPEN_COMPOSER_PAD = 10;
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const scrollViewRef = useRef<ScrollView>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const flatListRef = useRef<FlatList<Message> | null>(null);
 
-  // Calculate resting and active bottom offsets
-  const restingBottom = TAB_BAR_HEIGHT + insets.bottom + 12;
-  const activeBottom = keyboardHeight > 0 ? keyboardHeight + 8 : restingBottom;
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [showCrisisBanner, setShowCrisisBanner] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  // Animated value for composer bottom offset
-  const composerBottom = useSharedValue(restingBottom);
+  const bottomInset = keyboardVisible
+    ? KEYBOARD_OPEN_COMPOSER_PAD
+    : composerBottomPadding(insets);
 
-  // Scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messages.length > 0) {
-      const timer = setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [messages, isTyping]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      show.remove();
+      hide.remove();
     };
   }, []);
 
-  // Keyboard event listeners
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
+
   useEffect(() => {
-    const showSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        const height = e.endCoordinates.height;
-        setKeyboardHeight(height);
-        composerBottom.value = withTiming(height + 8, {
-          duration: Platform.OS === 'ios' ? 250 : 300,
-          easing: Easing.out(Easing.ease),
-        });
+    const loadMessages = async () => {
+      try {
+        const loadedMessages = await loadChatMessages();
+        setMessages(loadedMessages);
+      } catch (error) {
+        console.error('Error loading messages:', error);
+      } finally {
+        setIsInitializing(false);
       }
-    );
-
-    const hideSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-        const currentRestingBottom = TAB_BAR_HEIGHT + insets.bottom + 12;
-        composerBottom.value = withTiming(currentRestingBottom, {
-          duration: Platform.OS === 'ios' ? 250 : 300,
-          easing: Easing.out(Easing.ease),
-        });
-      }
-    );
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
     };
-  }, [insets.bottom]);
+    loadMessages();
+  }, []);
 
-  // Animated style for composer container
-  const composerAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      bottom: composerBottom.value,
-    };
-  });
+  useEffect(() => {
+    if (!isInitializing && messages.length > 0) {
+      saveChatMessages(messages).catch((error) => {
+        console.error('Error saving messages:', error);
+      });
+    }
+  }, [messages, isInitializing]);
 
   const handleSend = async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || isLoading) return;
 
-    // Clear any existing timeout
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+    const hasCrisisKeywords = containsCrisisKeywords(text);
+    if (hasCrisisKeywords && !showCrisisBanner) {
+      setShowCrisisBanner(true);
     }
 
-    // Add user message
-    const userMessage: Message = {
-      id: `user_${Date.now()}`,
+    const userMessage: ChatMessage = {
+      id: `user_${Date.now()}_${Math.random()}`,
       role: 'user',
-      content: text,
+      content: text.trim(),
       createdAt: Date.now(),
+      status: 'sending',
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setIsTyping(true);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setIsLoading(true);
 
-    // Simulate Novi thinking (600-900ms)
-    const delay = 600 + Math.random() * 300;
-    
-    timeoutRef.current = setTimeout(() => {
-      const noviResponse = generateNoviResponse(text);
-      
-      const assistantMessage: Message = {
-        id: `assistant_${Date.now()}`,
+    try {
+      const messagesForAI: ChatMessage[] = updatedMessages.map((msg) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        createdAt: msg.createdAt,
+      }));
+
+      const response = await getAIResponseWithRetry(messagesForAI);
+
+      if (response.error) {
+        const assistantMsg: ChatMessage = {
+          id: `assistant_${Date.now()}_${Math.random()}`,
+          role: 'assistant',
+          content: response.error || "Something went wrong. Let's try again.",
+          createdAt: Date.now(),
+          status: 'error',
+        };
+        setMessages((prev) => [
+          ...prev.map((m) => (m.id === userMessage.id ? { ...m, status: 'sent' as const } : m)),
+          assistantMsg,
+        ]);
+      } else {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const assistantMsg: ChatMessage = {
+          id: `assistant_${Date.now()}_${Math.random()}`,
+          role: 'assistant',
+          content: response.reply,
+          createdAt: Date.now(),
+          status: 'sent',
+        };
+        setMessages((prev) => [
+          ...prev.map((m) => (m.id === userMessage.id ? { ...m, status: 'sent' as const } : m)),
+          assistantMsg,
+        ]);
+      }
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      const assistantMsg: ChatMessage = {
+        id: `assistant_${Date.now()}_${Math.random()}`,
         role: 'assistant',
-        content: noviResponse,
+        content: "Something went wrong. Let's try again.",
         createdAt: Date.now(),
+        status: 'error',
       };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsTyping(false);
-      timeoutRef.current = null;
-    }, delay);
+      setMessages((prev) => [
+        ...prev.map((m) => (m.id === userMessage.id ? { ...m, status: 'sent' as const } : m)),
+        assistantMsg,
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handlePromptSelect = (prompt: string) => {
     handleSend(prompt);
   };
 
-  const showEmptyState = messages.length === 0 && !isTyping;
+  const handleClearChat = () => {
+    Alert.alert(
+      'Clear chat',
+      'This will delete all your messages. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await clearChatMessages();
+              setMessages([]);
+              setShowCrisisBanner(false);
+            } catch (error) {
+              console.error('Error clearing chat:', error);
+              Alert.alert('Error', 'Failed to clear chat. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
-  // Calculate message list bottom padding
-  const messageListPaddingBottom = keyboardHeight > 0
-    ? 120 + keyboardHeight + 8
-    : 120 + 12 + TAB_BAR_HEIGHT + insets.bottom;
+  const showEmptyState = messages.length === 0 && !isLoading && !isInitializing;
+
+  const showDisclaimer = messages.length > 0 && messages.length <= 2 && !isLoading;
+
+  const messageItems: Message[] = messages.map((msg) => ({
+    id: msg.id,
+    role: msg.role,
+    content: msg.content,
+    createdAt: msg.createdAt,
+  }));
+
+  const renderMessage: ListRenderItem<Message> = ({ item }) => (
+    <MessageBubble message={item} />
+  );
+
+  const composerBlock = (
+    <View style={[styles.composerBlock, { paddingBottom: bottomInset }]}>
+      {!showEmptyState && isLoading && (
+        <View style={styles.typingWrap}>
+          <TypingIndicator />
+        </View>
+      )}
+      <InputBar onSend={handleSend} disabled={isLoading} />
+      {!showEmptyState && showDisclaimer && (
+        <Text style={styles.disclaimerInline}>
+          This isn&apos;t medical advice. If you need professional support, please reach out to a
+          qualified mental health professional.
+        </Text>
+      )}
+    </View>
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: HomeColors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 16, paddingBottom: 16 }]}>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>Novi</Text>
-          <Text style={styles.subtitle}>A calm space to talk things through</Text>
-        </View>
-      </View>
-
-      {/* Conversation Area */}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: messageListPaddingBottom },
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+    <LinearGradient
+      colors={['hsl(28, 7%, 6%)', 'hsl(30, 8%, 9%)', 'hsl(30, 8%, 7%)']}
+      locations={[0, 0.45, 1]}
+      style={styles.gradient}
+    >
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {showEmptyState ? (
-          <>
-            <EmptyState />
-            <PromptChips onSelect={handlePromptSelect} />
-          </>
-        ) : (
-          <View style={styles.messagesContainer}>
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
-            {isTyping && <TypingIndicator />}
+        <View style={[styles.header, { paddingTop: insets.top + 16, paddingBottom: 16 }]}>
+          <View style={styles.headerContent}>
+            <Text style={styles.title}>Chat</Text>
+            <Text style={styles.subtitle}>A calm space to talk.</Text>
           </View>
-        )}
-      </ScrollView>
+          {messages.length > 0 && (
+            <TouchableOpacity
+              onPress={handleClearChat}
+              style={styles.clearButton}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.clearButtonText}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-      {/* Floating Input Bar */}
-      <Animated.View style={[styles.inputBarContainer, composerAnimatedStyle]}>
-        <InputBar onSend={handleSend} disabled={isTyping} />
-      </Animated.View>
-    </View>
+        {showCrisisBanner && (
+          <ChatCrisisBanner onDismiss={() => setShowCrisisBanner(false)} />
+        )}
+
+        {showEmptyState ? (
+          <View style={styles.emptyWrap}>
+            <View style={styles.emptyCenter}>
+              <EmptyState />
+            </View>
+            <View style={[styles.emptyComposer, { paddingBottom: bottomInset }]}>
+              <PromptChips onSelect={handlePromptSelect} />
+              <View style={styles.chipsToInputGap} />
+              <InputBar onSend={handleSend} disabled={isLoading} />
+            </View>
+          </View>
+        ) : (
+          <>
+            <FlatList
+              ref={flatListRef}
+              data={messageItems}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMessage}
+              style={styles.messageList}
+              contentContainerStyle={styles.messageListContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              onContentSizeChange={scrollToBottom}
+            />
+            {composerBlock}
+          </>
+        )}
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  gradient: {
+    flex: 1,
+  },
+  keyboardView: {
     flex: 1,
   },
   header: {
     paddingHorizontal: HomeSpacing.md,
-    borderBottomWidth: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   headerContent: {
+    flex: 1,
     alignItems: 'flex-start',
   },
   title: {
     fontSize: HomeTypography.fontSize['2xl'],
     fontWeight: HomeTypography.fontWeight.light,
-    color: HomeColors.foreground,
+    color: HomeColorsDark.foreground,
     letterSpacing: HomeTypography.letterSpacing,
     marginBottom: 2,
   },
   subtitle: {
     fontSize: HomeTypography.fontSize.xs,
     fontWeight: HomeTypography.fontWeight.light,
-    color: HomeColors.muted,
+    color: HomeColorsDark.muted,
     letterSpacing: HomeTypography.letterSpacing,
     opacity: 0.7,
   },
-  scrollView: {
+  clearButton: {
+    paddingVertical: HomeSpacing.xs,
+    paddingHorizontal: HomeSpacing.sm,
+    marginTop: 4,
+  },
+  clearButtonText: {
+    fontSize: HomeTypography.fontSize.sm,
+    fontWeight: HomeTypography.fontWeight.light,
+    color: HomeColorsDark.muted,
+    letterSpacing: HomeTypography.letterSpacing,
+    opacity: 0.7,
+  },
+  emptyWrap: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
+  emptyCenter: {
+    flex: 1,
+    justifyContent: 'center',
     paddingHorizontal: HomeSpacing.md,
-    paddingTop: HomeSpacing.lg,
   },
-  messagesContainer: {
+  emptyComposer: {
+    paddingHorizontal: HomeSpacing.md,
+  },
+  chipsToInputGap: {
+    height: 10,
+  },
+  messageList: {
     flex: 1,
   },
-  inputBarContainer: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 10,
+  messageListContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: HomeSpacing.md,
+    paddingTop: HomeSpacing.sm,
+    paddingBottom: HomeSpacing.sm,
+  },
+  composerBlock: {
+    paddingHorizontal: HomeSpacing.md,
+    paddingTop: HomeSpacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'hsla(40, 10%, 28%, 0.25)',
+    backgroundColor: 'hsla(30, 8%, 8%, 0.94)',
+  },
+  typingWrap: {
+    marginBottom: HomeSpacing.sm,
+  },
+  disclaimerInline: {
+    marginTop: HomeSpacing.sm,
+    fontSize: HomeTypography.fontSize.xs - 1,
+    fontWeight: HomeTypography.fontWeight.light,
+    color: HomeColorsDark.muted,
+    letterSpacing: HomeTypography.letterSpacing,
+    opacity: 0.65,
+    textAlign: 'center',
+    lineHeight: (HomeTypography.fontSize.xs - 1) * 1.4,
+    paddingHorizontal: HomeSpacing.xs,
   },
 });

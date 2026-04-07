@@ -50,9 +50,9 @@ export function WelcomeScreen({ onEnter }: WelcomeScreenProps) {
       <Animated.View style={[styles.content, containerStyle]}>
         <LumioLogo delay={0} size="lg" />
 
-        <Text style={styles.title}>You're all set 🌿</Text>
+        <Text style={styles.title}>You&apos;re all set 🌿</Text>
         <Text style={styles.text}>
-          Take a moment.{'\n'}Lumio is here when you're ready.
+          Take a moment.{'\n'}Lumio is here when you&apos;re ready.
         </Text>
       </Animated.View>
     </View>

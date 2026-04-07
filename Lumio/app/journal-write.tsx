@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -21,6 +21,8 @@ import Animated, {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { HomeColors, HomeTypography, HomeSpacing } from '@/constants/home-theme';
 import { JournalStorage, JournalEntry } from '@/utils/journal-storage';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import * as Haptics from 'expo-haptics';
 
 // Format date as "Sunday · Jan 11"
 function getJournalDateString(): string {
@@ -61,6 +63,8 @@ function getTodayDateKey(): string {
 }
 
 export default function JournalWriteScreen() {
+  const { showGentlePrompt, startBlankPage } = useAppTheme();
+  const colors = HomeColors;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const textInputRef = useRef<TextInput>(null);
@@ -75,7 +79,7 @@ export default function JournalWriteScreen() {
   const saveStatusOpacity = useSharedValue(0);
   const containerOpacity = useSharedValue(0);
   const containerTranslateY = useSharedValue(8);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fade up animation on mount
   useEffect(() => {
@@ -99,9 +103,10 @@ export default function JournalWriteScreen() {
     }
   }, []);
 
-  // Load existing entry for today
+  // Load existing entry for today (skip when "blank page" preference is on)
   useEffect(() => {
     const loadTodayEntry = async () => {
+      if (startBlankPage) return;
       try {
         const todayKey = getTodayDateKey();
         const entry = await JournalStorage.getEntryByDate(todayKey);
@@ -114,9 +119,9 @@ export default function JournalWriteScreen() {
         console.error('Error loading entry:', error);
       }
     };
-    
+
     loadTodayEntry();
-  }, []);
+  }, [startBlankPage]);
 
   // Auto-save function with debounce
   const saveEntry = useCallback(async (text: string) => {
@@ -178,6 +183,7 @@ export default function JournalWriteScreen() {
     }
     
     if (content.trim()) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await saveEntry(content);
     }
     
@@ -191,6 +197,7 @@ export default function JournalWriteScreen() {
     }
     
     if (content.trim()) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await saveEntry(content);
     }
     
@@ -218,18 +225,78 @@ export default function JournalWriteScreen() {
     opacity: saveStatusOpacity.value,
   }));
 
-  // Paper page colors - warm gray with subtle gradient
-  const paperBackground = 'hsl(30, 6%, 12%)'; // Slightly lighter than background
+  const paperBackground = 'hsl(30, 6%, 12%)';
+
+  const fs = 1;
+  const textStyleOverrides = useMemo(
+    () => ({
+      dateText: [
+        styles.dateText,
+        { color: colors.muted, fontSize: HomeTypography.fontSize.sm * fs },
+      ],
+      timeContextText: [
+        styles.timeContextText,
+        { color: colors.muted, fontSize: HomeTypography.fontSize.xs * fs },
+      ],
+      doneButtonText: [
+        styles.doneButtonText,
+        { color: colors.primary, fontSize: HomeTypography.fontSize.sm * fs },
+      ],
+      promptTitle: [
+        styles.promptTitle,
+        { color: colors.foreground, fontSize: HomeTypography.fontSize.xl * fs },
+      ],
+      promptSubtitle: [
+        styles.promptSubtitle,
+        {
+          color: colors.muted,
+          fontSize: HomeTypography.fontSize.base * fs,
+          lineHeight: HomeTypography.fontSize.base * fs * HomeTypography.lineHeight.normal,
+        },
+      ],
+      promptHelper: [
+        styles.promptHelper,
+        { color: colors.muted, fontSize: HomeTypography.fontSize.sm * fs },
+      ],
+      placeholderText: [
+        styles.placeholderText,
+        { color: colors.muted, fontSize: 19 * fs, lineHeight: 30 * fs },
+      ],
+      textInput: [
+        styles.textInput,
+        {
+          color: colors.foreground,
+          fontSize: 19 * fs,
+          lineHeight: 30 * fs,
+        },
+      ],
+    }),
+    [colors, fs]
+  );
+
+  const paperSurfaceDynamic = useMemo(
+    () => ({
+      borderColor: colors.cardBorder,
+      backgroundColor: 'hsl(30, 6%, 12%)',
+      shadowColor: colors.cardShadow,
+    }),
+    [colors.cardBorder, colors.cardShadow]
+  );
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: HomeColors.background }]}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
       <Animated.View style={[styles.contentContainer, containerAnimatedStyle]}>
         {/* Custom Top Bar */}
-        <View style={[styles.topBar, { paddingTop: insets.top + 12, paddingBottom: 12 }]}>
+        <View
+          style={[
+            styles.topBar,
+            { paddingTop: insets.top + 12, paddingBottom: 12, backgroundColor: colors.background },
+          ]}
+        >
           <TouchableOpacity
             onPress={handleBack}
             style={styles.backButton}
@@ -239,21 +306,21 @@ export default function JournalWriteScreen() {
             <IconSymbol
               name={'chevron.left' as 'chevron.left'}
               size={20}
-              color={HomeColors.muted}
+              color={colors.muted}
             />
           </TouchableOpacity>
 
           <View style={styles.dateContainer}>
-            <Text style={styles.dateText}>{dateString}</Text>
+            <Text style={textStyleOverrides.dateText}>{dateString}</Text>
             {timeContext && (
-              <Text style={styles.timeContextText}>{timeContext}</Text>
+              <Text style={textStyleOverrides.timeContextText}>{timeContext}</Text>
             )}
           </View>
 
           <View style={styles.doneButton}>
             {saveStatus === 'saved' ? (
               <Animated.View style={saveStatusAnimatedStyle}>
-                <Text style={styles.doneButtonText}>Saved</Text>
+                <Text style={textStyleOverrides.doneButtonText}>Saved</Text>
               </Animated.View>
             ) : (
               <TouchableOpacity
@@ -261,7 +328,7 @@ export default function JournalWriteScreen() {
                 activeOpacity={0.6}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={styles.doneButtonText}>Done</Text>
+                <Text style={textStyleOverrides.doneButtonText}>Done</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -288,25 +355,28 @@ export default function JournalWriteScreen() {
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.paperSurface}
+              style={[styles.paperSurface, paperSurfaceDynamic]}
             >
-              {/* Prompt Header */}
-              <View style={styles.promptHeader}>
-                <Text style={styles.promptTitle}>Take a breath.</Text>
-                <Text style={styles.promptSubtitle}>What's on your mind right now?</Text>
-                <Text style={styles.promptHelper}>One sentence is enough.</Text>
-              </View>
+              {showGentlePrompt && (
+                <View style={styles.promptHeader}>
+                  <Text style={textStyleOverrides.promptTitle}>Take a breath.</Text>
+                  <Text style={textStyleOverrides.promptSubtitle}>
+                    What&apos;s on your mind right now?
+                  </Text>
+                  <Text style={textStyleOverrides.promptHelper}>One sentence is enough.</Text>
+                </View>
+              )}
 
               {/* Writing Area */}
               <View style={styles.writingArea}>
                 {!content && (
                   <View style={styles.placeholderContainer} pointerEvents="none">
-                    <Text style={styles.placeholderText}>Start writing...</Text>
+                    <Text style={textStyleOverrides.placeholderText}>Start writing...</Text>
                   </View>
                 )}
                 <TextInput
                   ref={textInputRef}
-                  style={styles.textInput}
+                  style={textStyleOverrides.textInput}
                   value={content}
                   onChangeText={handleTextChange}
                   placeholder=""
@@ -314,8 +384,8 @@ export default function JournalWriteScreen() {
                   multiline
                   autoFocus={!content}
                   textAlignVertical="top"
-                  selectionColor={HomeColors.primary}
-                  cursorColor={HomeColors.primary}
+                  selectionColor={colors.primary}
+                  cursorColor={colors.primary}
                 />
               </View>
             </LinearGradient>
